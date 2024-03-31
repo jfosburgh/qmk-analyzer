@@ -1,0 +1,93 @@
+header,
+.content {
+	display: flex;
+}
+
+header>h1 {
+	flex-grow: 1;
+}
+
+.content {
+	flex-direction: column;
+	align-items: center;
+	justify-content: space-between;
+}
+
+.gamelist {
+	display: flex;
+	justify-content: center;
+	flex-wrap: wrap;
+}
+
+.game-card {
+	width: 200px;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	margin-inline: 25px;
+}
+
+.game-card>p {
+	text-align: center;
+}
+
+#game-name {
+	font-size: 3rem;
+	margin: 0px;
+}
+
+.board-container {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+}
+
+.game-board {
+	display: grid;
+	grid-template-rows: 1fr 1fr 1fr;
+	grid-template-columns: 1fr 1fr 1fr;
+	gap: 1px;
+	background: black;
+	margin-bottom: 20px;
+}
+
+.game-cell {
+	width: 100px;
+	height: 100px;
+	grid-row: auto;
+	grid-column: auto;
+	background: white;
+	font-size: 5rem;
+	display: grid;
+	justify-content: center;
+	align-items: center;
+}
+
+.enabled:hover {
+	background: grey;
+}
+
+.correct {
+	background: #10d910;
+}
+
+#game-text {
+	font-size: 2rem;
+}
+
+.button-group {
+	display: flex;
+	justify-content: space-around;
+	width: 100%;
+}
+
+#modeselect {
+	height: 150px;
+	display: flex;
+	flex-direction: column;
+	justify-content: start;
+}
+
+#modeselect>form {
+	margin-bottom: 20px;
+}

@@ -1,0 +1,22 @@
+<form>
+	<label for="keyboard-select">Keyboards</label>
+	<select name="keyboard-select">
+		{{ range .KeyboardNames }}
+		{{ if eq $.SelectedKeyboard . }}
+		<option selected="selected" value="{{.}}">{{.}}</option>
+		{{ else }}
+		<option value="{{.}}">{{.}}</option>
+		{{ end }}
+		{{ end }}
+	</select>
+	<label for="layout-select">Layouts</label>
+	<select>
+		{{ range .LayoutNames }}
+		{{ if eq $.SelectedLayout . }}
+		<option selected="selected" value="{{.}}">{{.}}</option>
+		{{ else }}
+		<option value="{{.}}">{{.}}</option>
+		{{ end }}
+		{{ end }}
+	</select>
+</form>
