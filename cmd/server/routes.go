@@ -23,10 +23,17 @@ type keyboardoptions struct {
 }
 
 func (app *application) handleIndex(w http.ResponseWriter, r *http.Request) {
+	keyboardNames, err := app.qmkHelper.GetAllKeyboardNames()
+	if err != nil {
+		w.WriteHeader(500)
+		app.logger.Error(err.Error())
+		return
+	}
+
 	keyboardOptions := keyboardoptions{
 		SelectedKeyboard: "default",
 		SelectedLayout:   "default",
-		KeyboardNames:    app.qmkHelper.GetAllKeyboardNames(),
+		KeyboardNames:    keyboardNames,
 		LayoutNames:      app.qmkHelper.GetAllLayoutNames("default"),
 	}
 
@@ -40,7 +47,7 @@ func (app *application) handleIndex(w http.ResponseWriter, r *http.Request) {
 		Keyboard:              qmk.Keyboard{Name: "default"},
 	}
 
-	err := app.templates.ExecuteTemplate(w, "index.html", data)
+	err = app.templates.ExecuteTemplate(w, "index.html", data)
 	if err != nil {
 		w.WriteHeader(500)
 		app.logger.Error(err.Error())

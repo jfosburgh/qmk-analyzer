@@ -30,7 +30,7 @@ type application struct {
 	logger    *slog.Logger
 	mux       *http.ServeMux
 	wg        sync.WaitGroup
-	qmkHelper qmk.QMKHelper
+	qmkHelper *qmk.QMKHelper
 	templates *template.Template
 }
 
@@ -46,8 +46,8 @@ func main() {
 	flag.Float64Var(&app.cfg.limiter.rps, "limiter-rps", 2, "Rate limiter maximum requests per second")
 	flag.IntVar(&app.cfg.limiter.burst, "limiter-burst", 4, "Rate limiter maximum burst")
 
-	flag.StringVar(&app.cfg.keyboardDir, "keyboard-dir", "./keyboards/", "Root directory for qmk keyboards")
-	flag.StringVar(&app.cfg.layoutDir, "layout-dir", "./layouts/", "Root directory for qmk layouts")
+	flag.StringVar(&app.cfg.keyboardDir, "keyboard-dir", "keyboards/", "Root directory for qmk keyboards")
+	flag.StringVar(&app.cfg.layoutDir, "layout-dir", "layouts/", "Root directory for qmk layouts")
 
 	flag.Parse()
 
