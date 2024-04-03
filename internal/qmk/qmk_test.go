@@ -16,6 +16,16 @@ func Equal[T comparable](t *testing.T, expected, actual T) {
 	}
 }
 
+func ArrayEqual[T comparable](t *testing.T, expected, actual []T) {
+	Equal(t, len(expected), len(actual))
+
+	if len(expected) == len(actual) {
+		for i := range len(expected) {
+			Equal(t, expected[i], actual[i])
+		}
+	}
+}
+
 func MapContains[T any](t *testing.T, targetKey string, data map[string]T) {
 	if _, ok := data[targetKey]; !ok {
 		t.Errorf("Expected map to contain key %s", targetKey)
@@ -42,31 +52,29 @@ func TestFindKeyboards(t *testing.T) {
 		"ferris/sweep",
 	}
 
-	Equal(t, len(expected_keyboards), len(keyboards))
-	if len(expected_keyboards) == len(keyboards) {
-		for i := range len(expected_keyboards) {
-			Equal(t, expected_keyboards[i], keyboards[i])
-		}
-	}
+	ArrayEqual(t, expected_keyboards, keyboards)
 }
 
-func TestLoadKeyboardFromJSON(t *testing.T) {
-	jsonPath := "./test_content/keyboards/ferris/sweep/info.json"
-	keyboard := KeyboardData{}
-	err := LoadFromJSONs([]string{jsonPath}, &keyboard)
-
+func TestFindInfoJSONs(t *testing.T) {
+	jsons, err := FindInfoJSONs("./test_content/keyboards/", "ferris/sweep")
 	NoError(t, err)
-	Equal(t, "Ferris sweep", keyboard.KeyboardName)
-	MapContains(t, "LAYOUT_split_3x5_2", keyboard.Layouts)
+
+	expectedJSONs := []string{
+		"test_content/keyboards/ferris/info.json",
+		"test_content/keyboards/ferris/sweep/info.json",
+	}
+
+	ArrayEqual(t, expectedJSONs, jsons)
 }
 
 func TestLoadKeyboardFromJSONs(t *testing.T) {
-	jsonPath1 := "./test_content/keyboards/ferris/sweep/info.json"
-	jsonPath2 := "./test_content/keyboards/ferris/info.json"
-	keyboard := KeyboardData{}
-	err := LoadFromJSONs([]string{jsonPath1, jsonPath2}, &keyboard)
-
+	jsons, err := FindInfoJSONs("./test_content/keyboards/", "ferris/sweep")
 	NoError(t, err)
+
+	keyboard := KeyboardData{}
+	err = LoadFromJSONs(jsons, &keyboard)
+	NoError(t, err)
+
 	Equal(t, "Ferris sweep", keyboard.KeyboardName)
 	MapContains(t, "LAYOUT_split_3x5_2", keyboard.Layouts)
 }

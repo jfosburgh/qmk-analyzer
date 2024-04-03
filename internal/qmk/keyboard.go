@@ -2,8 +2,11 @@ package qmk
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
+	"path"
+	"strings"
 )
 
 type KeyboardData struct {
@@ -44,4 +47,20 @@ func LoadFromJSONs(jsonPaths []string, keyboardData *KeyboardData) error {
 	}
 
 	return nil
+}
+
+func FindInfoJSONs(rootPath, keyboard string) ([]string, error) {
+	jsons := []string{}
+	paths := strings.Split(keyboard, string(os.PathSeparator))
+
+	for _, pathPart := range paths {
+		rootPath = path.Join(rootPath, pathPart)
+		jsonPath := path.Join(rootPath, "info.json")
+
+		if _, err := os.Stat(jsonPath); err == nil {
+			jsons = append(jsons, jsonPath)
+		}
+	}
+
+	return jsons, nil
 }
