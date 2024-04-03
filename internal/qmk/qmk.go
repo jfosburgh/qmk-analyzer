@@ -79,9 +79,18 @@ func (q *QMKHelper) GetAllKeyboardNames() ([]string, error) {
 }
 
 func (q *QMKHelper) GetLayoutsForKeyboard(keyboard string) ([]string, error) {
-	names := []string{"Default"}
+	jsons, err := FindInfoJSONs(q.KeyboardDir, keyboard)
+	if err != nil {
+		return []string{}, err
+	}
 
-	return names, nil
+	keyboardData := KeyboardData{}
+	err = LoadFromJSONs(jsons, &keyboardData)
+	if err != nil {
+		return []string{}, err
+	}
+
+	return keyboardData.GetLayouts(), nil
 }
 
 func (q *QMKHelper) GetKeyboard(keyboardName, layoutName string) (Keyboard, error) {

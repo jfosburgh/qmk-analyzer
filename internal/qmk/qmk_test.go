@@ -1,6 +1,7 @@
 package qmk
 
 import (
+	"slices"
 	"testing"
 )
 
@@ -21,8 +22,14 @@ func ArrayEqual[T comparable](t *testing.T, expected, actual []T) {
 
 	if len(expected) == len(actual) {
 		for i := range len(expected) {
-			Equal(t, expected[i], actual[i])
+			ArrayContains(t, expected[i], actual)
 		}
+	}
+}
+
+func ArrayContains[T comparable](t *testing.T, target T, data []T) {
+	if !slices.Contains(data, target) {
+		t.Errorf("Expected to contain %v", target)
 	}
 }
 
@@ -77,4 +84,36 @@ func TestLoadKeyboardFromJSONs(t *testing.T) {
 
 	Equal(t, "Ferris sweep", keyboard.KeyboardName)
 	MapContains(t, "LAYOUT_split_3x5_2", keyboard.Layouts)
+
+	ArrayEqual(t, []string{"LAYOUT_split_3x5_2"}, keyboard.GetLayouts())
+
+	jsons, err = FindInfoJSONs("./test_content/keyboards/", "ferris/0_2/bling")
+	NoError(t, err)
+
+	keyboard = KeyboardData{}
+	err = LoadFromJSONs(jsons, &keyboard)
+	NoError(t, err)
+
+	Equal(t, "Ferris 0.2 - Bling", keyboard.KeyboardName)
+	MapContains(t, "LAYOUT_split_3x5_2", keyboard.Layouts)
+
+	ArrayEqual(t, []string{"LAYOUT_split_3x5_2"}, keyboard.GetLayouts())
+
+	jsons, err = FindInfoJSONs("./test_content/keyboards/", "0_sixty/base")
+	NoError(t, err)
+
+	keyboard = KeyboardData{}
+	err = LoadFromJSONs(jsons, &keyboard)
+	NoError(t, err)
+
+	Equal(t, "0-Sixty", keyboard.KeyboardName)
+
+	expectedLayouts := []string{
+		"LAYOUT_1x2uC",
+		"LAYOUT_2x2uC",
+		"LAYOUT_ortho_5x12",
+		"LAYOUT_1x2uR",
+		"LAYOUT_1x2uL",
+	}
+	ArrayEqual(t, expectedLayouts, keyboard.GetLayouts())
 }

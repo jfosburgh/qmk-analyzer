@@ -2,7 +2,6 @@ package qmk
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"os"
 	"path"
@@ -26,6 +25,16 @@ type LayoutData struct {
 		W      float64 `json:"w,omitempty"`
 		Matrix []int   `json:"matrix"`
 	} `json:"layout"`
+}
+
+func (k *KeyboardData) GetLayouts() []string {
+	layouts := []string{}
+
+	for layout, _ := range k.Layouts {
+		layouts = append(layouts, layout)
+	}
+
+	return layouts
 }
 
 func LoadFromJSONs(jsonPaths []string, keyboardData *KeyboardData) error {
