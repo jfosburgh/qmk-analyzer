@@ -17,7 +17,10 @@
 		<h1 class="title">How good is your layout?</h1>
 	</header>
 	<div class="selector">
-		{{ template "comp_keyboard_select.html" .KeyboardSelectOptions }}
+		{{ template "comp_select.html" .KeyboardSelectOptions }}
+	</div>
+	<div class="selector">
+		{{ template "comp_select.html" .LayoutSelectOptions }}
 	</div>
 	<div class="visualizer">
 		{{ template "comp_keyboard_visualizer.html" .Keyboard }}

@@ -15,11 +15,11 @@ var (
 	css embed.FS
 )
 
-type keyboardoptions struct {
-	SelectedKeyboard string
-	SelectedLayout   string
-	KeyboardNames    []string
-	LayoutNames      []string
+type selectOptions struct {
+	Selected string
+	Options  []string
+	Name     string
+	Label    string
 }
 
 func (app *application) handleIndex(w http.ResponseWriter, r *http.Request) {
@@ -30,21 +30,44 @@ func (app *application) handleIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	keyboardOptions := keyboardoptions{
-		SelectedKeyboard: "default",
-		SelectedLayout:   "default",
-		KeyboardNames:    keyboardNames,
-		LayoutNames:      app.qmkHelper.GetAllLayoutNames("default"),
+	keyboardOptions := selectOptions{
+		Selected: keyboardNames[0],
+		Options:  keyboardNames,
+		Name:     "keyboard-select",
+		Label:    "Keyboard",
+	}
+
+	layoutNames, err := app.qmkHelper.GetLayoutsForKeyboard(keyboardNames[0])
+	if err != nil {
+		w.WriteHeader(500)
+		app.logger.Error(err.Error())
+		return
+	}
+
+	layoutOptions := selectOptions{
+		Selected: layoutNames[0],
+		Options:  layoutNames,
+		Name:     "layout-select",
+		Label:    "Layout",
+	}
+
+	keyboard, err := app.qmkHelper.GetKeyboard(keyboardOptions.Selected, layoutOptions.Selected)
+	if err != nil {
+		w.WriteHeader(500)
+		app.logger.Error(err.Error())
+		return
 	}
 
 	type templateData struct {
-		KeyboardSelectOptions keyboardoptions
+		KeyboardSelectOptions selectOptions
+		LayoutSelectOptions   selectOptions
 		Keyboard              qmk.Keyboard
 	}
 
 	data := templateData{
 		KeyboardSelectOptions: keyboardOptions,
-		Keyboard:              qmk.Keyboard{Name: "default"},
+		Keyboard:              keyboard,
+		LayoutSelectOptions:   layoutOptions,
 	}
 
 	err = app.templates.ExecuteTemplate(w, "index.html", data)

@@ -13,7 +13,8 @@ type QMKHelper struct {
 }
 
 type Keyboard struct {
-	Name string
+	Name   string
+	Layout string
 }
 
 func findKeyboardsRecursive(base, sourceDir string) ([]string, error) {
@@ -69,8 +70,17 @@ func (q *QMKHelper) GetAllKeyboardNames() ([]string, error) {
 	return names, nil
 }
 
-func (q *QMKHelper) GetAllLayoutNames(keyboard string) []string {
-	names := []string{}
+func (q *QMKHelper) GetLayoutsForKeyboard(keyboard string) ([]string, error) {
+	names := []string{"Default"}
 
-	return names
+	return names, nil
+}
+
+func (q *QMKHelper) GetKeyboard(keyboardName, layoutName string) (Keyboard, error) {
+	keyboard := Keyboard{
+		Name:   keyboardName,
+		Layout: layoutName,
+	}
+
+	return keyboard, nil
 }

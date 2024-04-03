@@ -1,0 +1,12 @@
+<form>
+	<label for="{{.Name}}">{{.Label}}</label>
+	<select name="{{.Name}}">
+		{{ range .Options }}
+		{{ if eq $.Selected . }}
+		<option selected="selected" value="{{.}}">{{.}}</option>
+		{{ else }}
+		<option value="{{.}}">{{.}}</option>
+		{{ end }}
+		{{ end }}
+	</select>
+</form>
