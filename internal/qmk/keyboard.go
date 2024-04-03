@@ -19,12 +19,15 @@ type KeyboardData struct {
 }
 
 type LayoutData struct {
-	Layout []struct {
-		X      float64 `json:"x"`
-		Y      float64 `json:"y"`
-		W      float64 `json:"w,omitempty"`
-		Matrix []int   `json:"matrix"`
-	} `json:"layout"`
+	Layout []KeyData `json:"layout"`
+}
+
+type KeyData struct {
+	X      float64 `json:"x"`
+	Y      float64 `json:"y"`
+	W      float64 `json:"w"`
+	H      float64 `json:"h"`
+	Matrix []int   `json:"matrix"`
 }
 
 func (k *KeyboardData) GetLayouts() []string {
