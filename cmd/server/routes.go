@@ -6,6 +6,7 @@ import (
 	"html/template"
 	"net/http"
 	"path/filepath"
+	"slices"
 
 	"github.com/qmk-analyzer/internal/qmk"
 )
@@ -16,10 +17,67 @@ var (
 )
 
 type selectOptions struct {
-	Selected string
-	Options  []string
-	Name     string
-	Label    string
+	Selected   string
+	Options    []string
+	Name       string
+	Label      string
+	SwapTarget string
+	Include    string
+	Trigger    string
+}
+
+func (app *application) handleKeyboardSelect(w http.ResponseWriter, r *http.Request) {
+	keyboardName := r.FormValue("keyboardselect")
+
+	layoutNames, err := app.qmkHelper.GetLayoutsForKeyboard(keyboardName)
+	if err != nil {
+		w.WriteHeader(500)
+		app.logger.Error(err.Error())
+		return
+	}
+
+	layoutOptions := selectOptions{
+		Selected:   layoutNames[0],
+		Options:    layoutNames,
+		Name:       "layoutselect",
+		Label:      "Layout",
+		SwapTarget: "visualizer",
+		Include:    "keyboardselect-form",
+		Trigger:    "load, change",
+	}
+
+	err = app.templates.ExecuteTemplate(w, "comp_select.html", layoutOptions)
+	if err != nil {
+		w.WriteHeader(500)
+		app.logger.Error(err.Error())
+	}
+}
+
+func (app *application) hanldeLayoutSelect(w http.ResponseWriter, r *http.Request) {
+	layoutName := r.FormValue("layoutselect")
+	keyboardName := r.FormValue("keyboardselect")
+
+	layoutChoices, err := app.qmkHelper.GetLayoutsForKeyboard(keyboardName)
+	if err != nil {
+		w.WriteHeader(500)
+		app.logger.Error(err.Error())
+	}
+
+	if !slices.Contains(layoutChoices, layoutName) {
+		layoutName = layoutChoices[0]
+	}
+
+	keyboard, err := app.qmkHelper.GetKeyboard(keyboardName, layoutName)
+	if err != nil {
+		w.WriteHeader(500)
+		app.logger.Error(err.Error())
+	}
+
+	err = app.templates.ExecuteTemplate(w, "comp_keyboard_visualizer.html", keyboard)
+	if err != nil {
+		w.WriteHeader(500)
+		app.logger.Error(err.Error())
+	}
 }
 
 func (app *application) handleIndex(w http.ResponseWriter, r *http.Request) {
@@ -31,10 +89,12 @@ func (app *application) handleIndex(w http.ResponseWriter, r *http.Request) {
 	}
 
 	keyboardOptions := selectOptions{
-		Selected: keyboardNames[0],
-		Options:  keyboardNames,
-		Name:     "keyboard-select",
-		Label:    "Keyboard",
+		Selected:   keyboardNames[0],
+		Options:    keyboardNames,
+		Name:       "keyboardselect",
+		Label:      "Keyboard",
+		SwapTarget: "layoutselect-form",
+		Trigger:    "change",
 	}
 
 	layoutNames, err := app.qmkHelper.GetLayoutsForKeyboard(keyboardNames[0])
@@ -45,10 +105,13 @@ func (app *application) handleIndex(w http.ResponseWriter, r *http.Request) {
 	}
 
 	layoutOptions := selectOptions{
-		Selected: layoutNames[0],
-		Options:  layoutNames,
-		Name:     "layout-select",
-		Label:    "Layout",
+		Selected:   layoutNames[0],
+		Options:    layoutNames,
+		Name:       "layoutselect",
+		Label:      "Layout",
+		SwapTarget: "visualizer",
+		Include:    "keyboardselect-form",
+		Trigger:    "load, change",
 	}
 
 	keyboard, err := app.qmkHelper.GetKeyboard(keyboardOptions.Selected, layoutOptions.Selected)
@@ -87,6 +150,8 @@ func (app *application) routes() http.Handler {
 	handler.Handle("GET /debug/metrics", expvar.Handler())
 
 	handler.HandleFunc("GET /", app.handleIndex)
+	handler.HandleFunc("POST /layoutselect", app.hanldeLayoutSelect)
+	handler.HandleFunc("POST /keyboardselect", app.handleKeyboardSelect)
 
 	return app.metrics(app.recoverPanic(app.enableCORS(app.rateLimit(handler))))
 }
