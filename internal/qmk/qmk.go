@@ -58,7 +58,15 @@ func NewQMKHelper(keyboardDir, layoutDir string) (*QMKHelper, error) {
 		return &QMKHelper{}, err
 	}
 
-	return &QMKHelper{KeyboardDir: keyboardDir, LayoutDir: layoutDir}, nil
+	if !strings.HasSuffix(keyboardDir, "/") {
+		keyboardDir += "/"
+	}
+
+	if !strings.HasSuffix(layoutDir, "/") {
+		layoutDir += "/"
+	}
+
+	return &QMKHelper{KeyboardDir: strings.TrimPrefix(keyboardDir, "./"), LayoutDir: strings.TrimPrefix(layoutDir, "./")}, nil
 }
 
 func (q *QMKHelper) GetAllKeyboardNames() ([]string, error) {
