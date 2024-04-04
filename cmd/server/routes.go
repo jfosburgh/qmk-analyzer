@@ -2,8 +2,11 @@ package main
 
 import (
 	"embed"
+	"encoding/json"
 	"expvar"
+	"fmt"
 	"html/template"
+	"io"
 	"net/http"
 	"path/filepath"
 	"slices"
@@ -72,7 +75,7 @@ func (app *application) hanldeLayoutSelect(w http.ResponseWriter, r *http.Reques
 		layoutName = layoutChoices[0]
 	}
 
-	keyboard, err := app.qmkHelper.GetKeyboard(keyboardName, layoutName, layer)
+	keyboard, err := app.qmkHelper.GetKeyboard(keyboardName, layoutName, layer, false)
 	if err != nil {
 		w.WriteHeader(500)
 		app.logger.Error(err.Error())
@@ -94,13 +97,119 @@ func (app *application) handleLayerSelect(w http.ResponseWriter, r *http.Request
 		app.logger.Error(err.Error())
 	}
 
-	keyboard, err := app.qmkHelper.GetKeyboard(keyboardName, layoutName, layer)
+	keyboard, err := app.qmkHelper.GetKeyboard(keyboardName, layoutName, layer, false)
 	if err != nil {
 		w.WriteHeader(500)
 		app.logger.Error(err.Error())
 	}
 
 	err = app.templates.ExecuteTemplate(w, "comp_keyboard_visualizer.html", keyboard)
+	if err != nil {
+		w.WriteHeader(500)
+		app.logger.Error(err.Error())
+	}
+}
+
+func (app *application) handleKeymapUploatd(w http.ResponseWriter, r *http.Request) {
+	r.ParseMultipartForm(1 << 20)
+
+	f, handler, err := r.FormFile("keymap-file")
+	defer f.Close()
+
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		app.logger.Error(err.Error())
+		return
+	}
+
+	if handler.Size > 1<<20 {
+		w.WriteHeader(http.StatusBadRequest)
+		app.logger.Error("maximum file size exceeded")
+		return
+	}
+
+	contentType := handler.Header.Get("Content-Type")
+	if contentType != "application/json" {
+		w.WriteHeader(http.StatusBadRequest)
+		app.logger.Error(fmt.Sprintf("invalid content type: %s", contentType))
+		return
+	}
+
+	bytes, err := io.ReadAll(f)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		app.logger.Error(err.Error())
+		return
+	}
+
+	keymapData := qmk.KeymapData{}
+	err = json.Unmarshal(bytes, &keymapData)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		app.logger.Error(err.Error())
+		return
+	}
+
+	keyboard, err := app.qmkHelper.GetKeyboard(keymapData.Keyboard, keymapData.Layout, 0, true)
+	if err != nil {
+		w.WriteHeader(500)
+		app.logger.Error(err.Error())
+		return
+	}
+
+	err = app.qmkHelper.ApplyKeymap(&keyboard, keymapData, 0)
+	if err != nil {
+		w.WriteHeader(500)
+		app.logger.Error(err.Error())
+		return
+	}
+
+	keyboardNames, err := app.qmkHelper.GetAllKeyboardNames()
+	if err != nil {
+		w.WriteHeader(500)
+		app.logger.Error(err.Error())
+		return
+	}
+
+	keyboardOptions := selectOptions{
+		Selected:   keymapData.Keyboard,
+		Options:    keyboardNames,
+		Name:       "keyboardselect",
+		Label:      "Keyboard",
+		SwapTarget: "layoutselect-form",
+		Trigger:    "change",
+	}
+
+	layoutNames, err := app.qmkHelper.GetLayoutsForKeyboard(keymapData.Keyboard)
+	if err != nil {
+		w.WriteHeader(500)
+		app.logger.Error(err.Error())
+		return
+	}
+
+	layoutOptions := selectOptions{
+		Selected:   keymapData.Layout,
+		Options:    layoutNames,
+		Name:       "layoutselect",
+		Label:      "Layout",
+		SwapTarget: "visualizer",
+		Include:    "#keyboardselect-form, #layerselect-form",
+		Trigger:    "change",
+	}
+
+	type templateData struct {
+		KeyboardSelectOptions selectOptions
+		LayoutSelectOptions   selectOptions
+		Keyboard              qmk.Keyboard
+	}
+
+	data := templateData{
+		KeyboardSelectOptions: keyboardOptions,
+		Keyboard:              keyboard,
+		LayoutSelectOptions:   layoutOptions,
+	}
+
+	err = app.templates.ExecuteTemplate(w, "index.html", data)
 	if err != nil {
 		w.WriteHeader(500)
 		app.logger.Error(err.Error())
@@ -141,7 +250,7 @@ func (app *application) handleIndex(w http.ResponseWriter, r *http.Request) {
 		Trigger:    "change",
 	}
 
-	keyboard, err := app.qmkHelper.GetKeyboard(keyboardOptions.Selected, layoutOptions.Selected, 0)
+	keyboard, err := app.qmkHelper.GetKeyboard(keyboardOptions.Selected, layoutOptions.Selected, 0, false)
 	if err != nil {
 		w.WriteHeader(500)
 		app.logger.Error(err.Error())
@@ -160,7 +269,7 @@ func (app *application) handleIndex(w http.ResponseWriter, r *http.Request) {
 		LayoutSelectOptions:   layoutOptions,
 	}
 
-	err = app.templates.ExecuteTemplate(w, "index.html", data)
+	err = app.templates.ExecuteTemplate(w, "base.html", data)
 	if err != nil {
 		w.WriteHeader(500)
 		app.logger.Error(err.Error())
@@ -180,6 +289,7 @@ func (app *application) routes() http.Handler {
 	handler.HandleFunc("POST /layoutselect", app.hanldeLayoutSelect)
 	handler.HandleFunc("POST /keyboardselect", app.handleKeyboardSelect)
 	handler.HandleFunc("POST /layerselect", app.handleLayerSelect)
+	handler.HandleFunc("POST /keymap/upload", app.handleKeymapUploatd)
 
 	return app.metrics(app.recoverPanic(app.enableCORS(app.rateLimit(handler))))
 }

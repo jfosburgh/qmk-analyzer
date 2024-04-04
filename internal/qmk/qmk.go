@@ -203,7 +203,74 @@ func (q *QMKHelper) GetLayoutsForKeyboard(keyboard string) ([]string, error) {
 	return keyboardData.GetLayouts(), nil
 }
 
-func (q *QMKHelper) GetKeyboard(keyboardName, layoutName string, layer int) (Keyboard, error) {
+func (q *QMKHelper) ApplyKeymap(keyboard *Keyboard, keymap KeymapData, layer int) error {
+	if keymap.Layers != nil {
+		keyboard.LayerCount = len(keymap.Layers)
+	} else {
+		return nil
+	}
+
+	if keyboard.LayerCount > 0 && layer >= keyboard.LayerCount {
+		return errors.New(fmt.Sprintf("layer %d does not exist for %s with %d layers", layer, keyboard.Name, keyboard.LayerCount))
+	}
+
+	for i := 0; i < keyboard.LayerCount; i++ {
+		keyboard.Layers = append(keyboard.Layers, i)
+	}
+
+	if keyboard.LayerCount > 0 && len(keyboard.Keys) != len(keymap.Layers[0]) {
+		return errors.New(fmt.Sprintf("number of keys in layout %d does not match number of keys in keymap %d for %s", layer, keyboard.LayerCount, keyboard.Name))
+	}
+
+	for i := range len(keyboard.Keys) {
+		keyboard.Keys[i].Keycap.Raw = keymap.Layers[layer][i]
+		keycode, ok := q.Keycodes[keyboard.Keys[i].Keycap.Raw]
+
+		if !ok {
+			parts := strings.Split(keyboard.Keys[i].Keycap.Raw, "(")
+			parts[len(parts)-1] = strings.Split(parts[len(parts)-1], ")")[0]
+			labelParts := []string{}
+
+			for _, part := range parts {
+				subCode, subOk := q.Keycodes[part]
+
+				if !subOk {
+					if strings.Contains(part, ",") {
+						substrings := strings.Split(part, ",")
+						labelParts[len(labelParts)-1] += " " + substrings[0]
+						labelParts = append(labelParts, q.Keycodes[substrings[1]].Label)
+					} else {
+						labelParts = append(labelParts, part)
+					}
+				} else {
+					labelParts = append(labelParts, subCode.Label)
+				}
+			}
+			if len(labelParts) == 1 {
+				keyboard.Keys[i].Keycap.Label = labelParts[0]
+			} else if len(labelParts) == 2 {
+				keyboard.Keys[i].Keycap.Modifier = labelParts[0]
+				keyboard.Keys[i].Keycap.Label = labelParts[1]
+			} else {
+				keyboard.Keys[i].Keycap.Modifier = strings.Join(labelParts[:len(labelParts)-1], " ")
+				keyboard.Keys[i].Keycap.Label = labelParts[len(labelParts)-1]
+			}
+		} else {
+			keyboard.Keys[i].Keycap.Label = keycode.Label
+		}
+
+		if keyboard.Keys[i].Keycap.Label == "Spacebar" {
+			keyboard.Keys[i].Keycap.Label = "Space"
+		}
+		if keyboard.Keys[i].Keycap.Label == "Backspace" {
+			keyboard.Keys[i].Keycap.Label = "Back Space"
+		}
+	}
+
+	return nil
+}
+
+func (q *QMKHelper) GetKeyboard(keyboardName, layoutName string, layer int, customKeymap bool) (Keyboard, error) {
 	keys := []Key{}
 
 	keyboard := Keyboard{
@@ -217,28 +284,14 @@ func (q *QMKHelper) GetKeyboard(keyboardName, layoutName string, layer int) (Key
 		return keyboard, err
 	}
 
-	if keyboardData.DefaultKeymap.Layers != nil {
-		keyboard.LayerCount = len(keyboardData.DefaultKeymap.Layers)
-	}
-
-	if keyboard.LayerCount > 0 && layer >= keyboard.LayerCount {
-		return keyboard, errors.New(fmt.Sprintf("layer %d does not exist for %s with %d layers", layer, keyboardName, keyboard.LayerCount))
-	}
-
-	for i := 0; i < keyboard.LayerCount; i++ {
-		keyboard.Layers = append(keyboard.Layers, i)
-	}
-
 	maxTop := 0.0
 	maxLeft := 0.0
 
 	layout, ok := keyboardData.Layouts[layoutName]
 	if !ok {
 		return keyboard, errors.New(fmt.Sprintf("Could not find layout %s in layout map for keyboard %s", layoutName, keyboardName))
-	} else if keyboard.LayerCount > 0 && len(layout.Layout) != len(keyboardData.DefaultKeymap.Layers[0]) {
-		return keyboard, errors.New(fmt.Sprintf("layer %d does not exist for %s with %d layers", layer, keyboardName, keyboard.LayerCount))
 	} else {
-		for i, keyData := range layout.Layout {
+		for _, keyData := range layout.Layout {
 			newKey := Key{
 				X: keyData.X*q.KeySize + 5.0,
 				Y: keyData.Y*q.KeySize + 5.0,
@@ -248,51 +301,6 @@ func (q *QMKHelper) GetKeyboard(keyboardName, layoutName string, layer int) (Key
 					MainSize:     q.KeySize / 3,
 					ModifierSize: q.KeySize / 5,
 				},
-			}
-
-			if keyboard.LayerCount > 0 {
-				newKey.Keycap.Raw = keyboardData.DefaultKeymap.Layers[layer][i]
-				// r := regexp.MustCompile(`/(.+?(?=\())\(([^\)]+)\)/gm`)
-				// matches := r.FindAllString(newKey.Keycap.Raw, -1)
-				keycode, ok := q.Keycodes[newKey.Keycap.Raw]
-				if !ok {
-					// newKey.Keycap.Label = newKey.Keycap.Raw
-					parts := strings.Split(newKey.Keycap.Raw, "(")
-					parts[len(parts)-1] = strings.Split(parts[len(parts)-1], ")")[0]
-					labelParts := []string{}
-					for _, part := range parts {
-						subCode, subOk := q.Keycodes[part]
-						if !subOk {
-							if strings.Contains(part, ",") {
-								substrings := strings.Split(part, ",")
-								labelParts[len(labelParts)-1] += " " + substrings[0]
-								labelParts = append(labelParts, q.Keycodes[substrings[1]].Label)
-							} else {
-								labelParts = append(labelParts, part)
-							}
-						} else {
-							labelParts = append(labelParts, subCode.Label)
-						}
-					}
-					if len(labelParts) == 1 {
-						newKey.Keycap.Label = labelParts[0]
-					} else if len(labelParts) == 2 {
-						newKey.Keycap.Modifier = labelParts[0]
-						newKey.Keycap.Label = labelParts[1]
-					} else {
-						newKey.Keycap.Modifier = strings.Join(labelParts[:len(labelParts)-1], " ")
-						newKey.Keycap.Label = labelParts[len(labelParts)-1]
-					}
-				} else {
-					newKey.Keycap.Label = keycode.Label
-				}
-
-				if newKey.Keycap.Label == "Spacebar" {
-					newKey.Keycap.Label = "Space"
-				}
-				if newKey.Keycap.Label == "Backspace" {
-					newKey.Keycap.Label = "Back Space"
-				}
 			}
 
 			keys = append(keys, newKey)
@@ -310,6 +318,13 @@ func (q *QMKHelper) GetKeyboard(keyboardName, layoutName string, layer int) (Key
 	keyboard.Keys = keys
 	keyboard.Height = maxTop + 10.0
 	keyboard.Width = maxLeft + 10.0
+
+	if !customKeymap {
+		err := q.ApplyKeymap(&keyboard, keyboardData.DefaultKeymap, layer)
+		if err != nil {
+			return keyboard, err
+		}
+	}
 
 	return keyboard, nil
 }

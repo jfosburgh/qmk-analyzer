@@ -1,18 +1,4 @@
-<!DOCTYPE html>
-<html lang="en">
-
-<head>
-	<meta charset="UTF-8" />
-	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-	<meta http-equiv="X-UA-Compatible" content="ie=edge" />
-	<script src="https://unpkg.com/htmx.org@1.9.10"
-		integrity="sha384-D1Kt99CQMDuVetoL1lrYwg5t+9QdHe7NLX/SoJYkXDFfX37iInKRy5xLSi8nO7UC"
-		crossorigin="anonymous"></script>
-	<link rel="stylesheet" href="/css/styles.css" />
-	<title>QMK Analyzer</title>
-</head>
-
-<body>
+<div id="content">
 	<header>
 		<h1 class="title">How good is your layout?</h1>
 	</header>
@@ -23,6 +9,5 @@
 		{{ template "comp_select.html" .LayoutSelectOptions }}
 	</div>
 	{{ template "comp_keyboard_visualizer.html" .Keyboard }}
-</body>
-
-</html>
+	{{ template "comp_keymap_upload.html" }}
+</div>
