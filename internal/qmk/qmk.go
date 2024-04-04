@@ -6,11 +6,17 @@ import (
 	"os"
 	"path"
 	"strings"
+	"sync"
+	"time"
 )
 
 type QMKHelper struct {
-	KeyboardDir string
-	LayoutDir   string
+	KeyboardDir   string
+	LayoutDir     string
+	KeyboardCache KeyboardCache
+	Lock          sync.Mutex
+	Shutdown      chan bool
+	Ticker        *time.Ticker
 }
 
 type Keyboard struct {
@@ -26,6 +32,13 @@ type Key struct {
 	Y float64
 	W float64
 	H float64
+}
+
+type KeyboardCache map[string]KeyboardCacheEntry
+
+type KeyboardCacheEntry struct {
+	Keyboard   KeyboardData
+	LastViewed time.Time
 }
 
 func findKeyboardsRecursive(base, sourceDir string) ([]string, error) {
@@ -77,7 +90,27 @@ func NewQMKHelper(keyboardDir, layoutDir string) (*QMKHelper, error) {
 		layoutDir += "/"
 	}
 
-	return &QMKHelper{KeyboardDir: strings.TrimPrefix(keyboardDir, "./"), LayoutDir: strings.TrimPrefix(layoutDir, "./")}, nil
+	ticker := time.NewTicker(time.Minute * 5)
+	done := make(chan bool)
+
+	q := &QMKHelper{
+		KeyboardDir:   strings.TrimPrefix(keyboardDir, "./"),
+		LayoutDir:     strings.TrimPrefix(layoutDir, "./"),
+		KeyboardCache: make(KeyboardCache),
+		Lock:          sync.Mutex{},
+		Shutdown:      done,
+		Ticker:        ticker,
+	}
+
+	return q, nil
+}
+
+func (q *QMKHelper) PruneKeyboardCache(lifetime time.Duration) {
+	for key := range q.KeyboardCache {
+		if time.Since(q.KeyboardCache[key].LastViewed) < lifetime {
+			delete(q.KeyboardCache, key)
+		}
+	}
 }
 
 func (q *QMKHelper) GetAllKeyboardNames() ([]string, error) {
@@ -90,18 +123,34 @@ func (q *QMKHelper) GetAllKeyboardNames() ([]string, error) {
 }
 
 func (q *QMKHelper) GetKeyboardData(keyboard string) (KeyboardData, error) {
-	keyboardData := KeyboardData{}
-	jsons, err := FindInfoJSONs(q.KeyboardDir, keyboard)
-	if err != nil {
-		return keyboardData, err
-	}
+	q.Lock.Lock()
+	defer q.Lock.Unlock()
 
-	err = LoadFromJSONs(jsons, &keyboardData)
-	if err != nil {
-		return keyboardData, err
-	}
+	cachedKeyboard, ok := q.KeyboardCache[keyboard]
+	if !ok {
+		keyboardData := KeyboardData{}
+		jsons, err := FindInfoJSONs(q.KeyboardDir, keyboard)
+		if err != nil {
+			return keyboardData, err
+		}
 
-	return keyboardData, nil
+		err = LoadFromJSONs(jsons, &keyboardData)
+		if err != nil {
+			return keyboardData, err
+		}
+
+		cachedKeyboard = KeyboardCacheEntry{
+			Keyboard:   keyboardData,
+			LastViewed: time.Now(),
+		}
+
+		q.KeyboardCache[keyboard] = cachedKeyboard
+
+		return keyboardData, nil
+	} else {
+		cachedKeyboard.LastViewed = time.Now()
+		return cachedKeyboard.Keyboard, nil
+	}
 }
 
 func (q *QMKHelper) GetLayoutsForKeyboard(keyboard string) ([]string, error) {

@@ -9,13 +9,13 @@ import (
 )
 
 type KeyboardData struct {
-	KeyboardName     string   `json:"keyboard_name,omitempty"`
-	Manufacturer     string   `json:"manufacturer,omitempty"`
-	CommunityLayouts []string `json:"community_layouts,omitempty"`
+	KeyboardName     string   `json:"keyboard_name"`
+	Manufacturer     string   `json:"manufacturer"`
+	CommunityLayouts []string `json:"community_layouts"`
 	LayoutAliases    struct {
-		Layout string `json:"LAYOUT,omitempty"`
-	} `json:"layout_aliases,omitempty"`
-	Layouts map[string]LayoutData `json:"layouts,omitempty"`
+		Layout string `json:"LAYOUT"`
+	} `json:"layout_aliases"`
+	Layouts map[string]LayoutData `json:"layouts"`
 }
 
 type LayoutData struct {
@@ -43,6 +43,8 @@ func (k *KeyboardData) GetLayouts() []string {
 func LoadFromJSONs(jsonPaths []string, keyboardData *KeyboardData) error {
 	for _, jsonPath := range jsonPaths {
 		f, err := os.Open(jsonPath)
+		defer f.Close()
+
 		if err != nil {
 			return err
 		}
