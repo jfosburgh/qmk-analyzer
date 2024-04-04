@@ -23,6 +23,7 @@ type config struct {
 	}
 	keyboardDir string
 	layoutDir   string
+	keycodeDir  string
 }
 
 type application struct {
@@ -37,7 +38,7 @@ type application struct {
 func main() {
 	app := application{
 		cfg:    config{},
-		logger: slog.New(slog.NewTextHandler(os.Stdout, nil)),
+		logger: slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{AddSource: true})),
 	}
 
 	flag.IntVar(&app.cfg.port, "port", 8080, "HTTP server port")
@@ -48,10 +49,11 @@ func main() {
 
 	flag.StringVar(&app.cfg.keyboardDir, "keyboard-dir", "keyboards/", "Root directory for qmk keyboards")
 	flag.StringVar(&app.cfg.layoutDir, "layout-dir", "layouts/", "Root directory for qmk layouts")
+	flag.StringVar(&app.cfg.keycodeDir, "keycode-dir", "keycodes/", "Root directory for qmk keycodes")
 
 	flag.Parse()
 
-	qmkHelper, err := qmk.NewQMKHelper(app.cfg.keyboardDir, app.cfg.layoutDir)
+	qmkHelper, err := qmk.NewQMKHelper(app.cfg.keyboardDir, app.cfg.layoutDir, app.cfg.keycodeDir)
 	if err != nil {
 		app.logger.Error(err.Error())
 		os.Exit(1)

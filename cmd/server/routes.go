@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"slices"
+	"strconv"
 
 	"github.com/qmk-analyzer/internal/qmk"
 )
@@ -42,7 +43,7 @@ func (app *application) handleKeyboardSelect(w http.ResponseWriter, r *http.Requ
 		Name:       "layoutselect",
 		Label:      "Layout",
 		SwapTarget: "visualizer",
-		Include:    "keyboardselect-form",
+		Include:    "#keyboardselect-form, #layerselect-form",
 		Trigger:    "load, change",
 	}
 
@@ -56,6 +57,10 @@ func (app *application) handleKeyboardSelect(w http.ResponseWriter, r *http.Requ
 func (app *application) hanldeLayoutSelect(w http.ResponseWriter, r *http.Request) {
 	layoutName := r.FormValue("layoutselect")
 	keyboardName := r.FormValue("keyboardselect")
+	layer, err := strconv.Atoi(r.FormValue("layer"))
+	if err != nil {
+		layer = 0
+	}
 
 	layoutChoices, err := app.qmkHelper.GetLayoutsForKeyboard(keyboardName)
 	if err != nil {
@@ -67,7 +72,29 @@ func (app *application) hanldeLayoutSelect(w http.ResponseWriter, r *http.Reques
 		layoutName = layoutChoices[0]
 	}
 
-	keyboard, err := app.qmkHelper.GetKeyboard(keyboardName, layoutName, 0)
+	keyboard, err := app.qmkHelper.GetKeyboard(keyboardName, layoutName, layer)
+	if err != nil {
+		w.WriteHeader(500)
+		app.logger.Error(err.Error())
+	}
+
+	err = app.templates.ExecuteTemplate(w, "comp_keyboard_visualizer.html", keyboard)
+	if err != nil {
+		w.WriteHeader(500)
+		app.logger.Error(err.Error())
+	}
+}
+
+func (app *application) handleLayerSelect(w http.ResponseWriter, r *http.Request) {
+	layoutName := r.FormValue("layoutselect")
+	keyboardName := r.FormValue("keyboardselect")
+	layer, err := strconv.Atoi(r.FormValue("layer"))
+	if err != nil {
+		w.WriteHeader(500)
+		app.logger.Error(err.Error())
+	}
+
+	keyboard, err := app.qmkHelper.GetKeyboard(keyboardName, layoutName, layer)
 	if err != nil {
 		w.WriteHeader(500)
 		app.logger.Error(err.Error())
@@ -94,7 +121,7 @@ func (app *application) handleIndex(w http.ResponseWriter, r *http.Request) {
 		Name:       "keyboardselect",
 		Label:      "Keyboard",
 		SwapTarget: "layoutselect-form",
-		Trigger:    "change",
+		Trigger:    "load, change",
 	}
 
 	layoutNames, err := app.qmkHelper.GetLayoutsForKeyboard(keyboardNames[0])
@@ -110,8 +137,8 @@ func (app *application) handleIndex(w http.ResponseWriter, r *http.Request) {
 		Name:       "layoutselect",
 		Label:      "Layout",
 		SwapTarget: "visualizer",
-		Include:    "keyboardselect-form",
-		Trigger:    "load, change",
+		Include:    "#keyboardselect-form, #layerselect-form",
+		Trigger:    "change",
 	}
 
 	keyboard, err := app.qmkHelper.GetKeyboard(keyboardOptions.Selected, layoutOptions.Selected, 0)
@@ -152,6 +179,7 @@ func (app *application) routes() http.Handler {
 	handler.HandleFunc("GET /", app.handleIndex)
 	handler.HandleFunc("POST /layoutselect", app.hanldeLayoutSelect)
 	handler.HandleFunc("POST /keyboardselect", app.handleKeyboardSelect)
+	handler.HandleFunc("POST /layerselect", app.handleLayerSelect)
 
 	return app.metrics(app.recoverPanic(app.enableCORS(app.rateLimit(handler))))
 }

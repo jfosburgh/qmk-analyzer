@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	_ "regexp"
 	"strings"
 	"sync"
 	"time"
@@ -13,19 +14,23 @@ import (
 type QMKHelper struct {
 	KeyboardDir   string
 	LayoutDir     string
+	Keycodes      map[string]Keycode
 	KeyboardCache KeyboardCache
 	Lock          sync.Mutex
 	Shutdown      chan bool
 	Ticker        *time.Ticker
+	KeySize       float64
 }
 
 type Keyboard struct {
-	Name       string
-	Layout     string
-	Keys       []Key
-	LayerCount int
-	Width      float64
-	Height     float64
+	Name         string
+	Layout       string
+	Keys         []Key
+	LayerCount   int
+	Layers       []int
+	CurrentLayer int
+	Width        float64
+	Height       float64
 }
 
 type Key struct {
@@ -37,7 +42,11 @@ type Key struct {
 }
 
 type KeyCap struct {
-	Raw string
+	Raw          string
+	Label        string
+	Modifier     string
+	MainSize     float64
+	ModifierSize float64
 }
 
 type KeyboardCache map[string]KeyboardCacheEntry
@@ -75,7 +84,7 @@ func findKeyboardsRecursive(base, sourceDir string) ([]string, error) {
 	return names, nil
 }
 
-func NewQMKHelper(keyboardDir, layoutDir string) (*QMKHelper, error) {
+func NewQMKHelper(keyboardDir, layoutDir, keycodeDir string) (*QMKHelper, error) {
 	if _, err := os.Stat(keyboardDir); os.IsNotExist(err) {
 		return &QMKHelper{}, fmt.Errorf("folder does not exist")
 	} else if err != nil {
@@ -83,6 +92,12 @@ func NewQMKHelper(keyboardDir, layoutDir string) (*QMKHelper, error) {
 	}
 
 	if _, err := os.Stat(layoutDir); os.IsNotExist(err) {
+		return &QMKHelper{}, fmt.Errorf("folder does not exist")
+	} else if err != nil {
+		return &QMKHelper{}, err
+	}
+
+	if _, err := os.Stat(keycodeDir); os.IsNotExist(err) {
 		return &QMKHelper{}, fmt.Errorf("folder does not exist")
 	} else if err != nil {
 		return &QMKHelper{}, err
@@ -96,16 +111,34 @@ func NewQMKHelper(keyboardDir, layoutDir string) (*QMKHelper, error) {
 		layoutDir += "/"
 	}
 
+	if !strings.HasSuffix(keycodeDir, "/") {
+		keycodeDir += "/"
+	}
+
 	ticker := time.NewTicker(time.Minute * 5)
 	done := make(chan bool)
+
+	keycodeJSONs, err := FindKeycodeJSONs(keycodeDir)
+	if err != nil {
+		fmt.Println("error finding keycodes")
+		return &QMKHelper{}, err
+	}
+
+	keycodes, err := LoadKeycodesFromJSONs(keycodeJSONs)
+	if err != nil {
+		fmt.Println("error parsing keycodes")
+		return &QMKHelper{}, err
+	}
 
 	q := &QMKHelper{
 		KeyboardDir:   strings.TrimPrefix(keyboardDir, "./"),
 		LayoutDir:     strings.TrimPrefix(layoutDir, "./"),
+		Keycodes:      keycodes,
 		KeyboardCache: make(KeyboardCache),
 		Lock:          sync.Mutex{},
 		Shutdown:      done,
 		Ticker:        ticker,
+		KeySize:       64,
 	}
 
 	return q, nil
@@ -174,8 +207,9 @@ func (q *QMKHelper) GetKeyboard(keyboardName, layoutName string, layer int) (Key
 	keys := []Key{}
 
 	keyboard := Keyboard{
-		Name:   keyboardName,
-		Layout: layoutName,
+		Name:         keyboardName,
+		Layout:       layoutName,
+		CurrentLayer: layer,
 	}
 
 	keyboardData, err := q.GetKeyboardData(keyboardName)
@@ -191,6 +225,10 @@ func (q *QMKHelper) GetKeyboard(keyboardName, layoutName string, layer int) (Key
 		return keyboard, errors.New(fmt.Sprintf("layer %d does not exist for %s with %d layers", layer, keyboardName, keyboard.LayerCount))
 	}
 
+	for i := 0; i < keyboard.LayerCount; i++ {
+		keyboard.Layers = append(keyboard.Layers, i)
+	}
+
 	maxTop := 0.0
 	maxLeft := 0.0
 
@@ -202,30 +240,76 @@ func (q *QMKHelper) GetKeyboard(keyboardName, layoutName string, layer int) (Key
 	} else {
 		for i, keyData := range layout.Layout {
 			newKey := Key{
-				X:      keyData.X*40.0 + 5.0,
-				Y:      keyData.Y*40.0 + 5.0,
-				W:      max(40.0, keyData.W*40.0),
-				H:      max(40.0, keyData.H*40.0),
-				Keycap: KeyCap{},
+				X: keyData.X*q.KeySize + 5.0,
+				Y: keyData.Y*q.KeySize + 5.0,
+				W: max(q.KeySize, keyData.W*q.KeySize),
+				H: max(q.KeySize, keyData.H*q.KeySize),
+				Keycap: KeyCap{
+					MainSize:     q.KeySize / 3,
+					ModifierSize: q.KeySize / 5,
+				},
 			}
 
 			if keyboard.LayerCount > 0 {
 				newKey.Keycap.Raw = keyboardData.DefaultKeymap.Layers[layer][i]
+				// r := regexp.MustCompile(`/(.+?(?=\())\(([^\)]+)\)/gm`)
+				// matches := r.FindAllString(newKey.Keycap.Raw, -1)
+				keycode, ok := q.Keycodes[newKey.Keycap.Raw]
+				if !ok {
+					// newKey.Keycap.Label = newKey.Keycap.Raw
+					parts := strings.Split(newKey.Keycap.Raw, "(")
+					parts[len(parts)-1] = strings.Split(parts[len(parts)-1], ")")[0]
+					labelParts := []string{}
+					for _, part := range parts {
+						subCode, subOk := q.Keycodes[part]
+						if !subOk {
+							if strings.Contains(part, ",") {
+								substrings := strings.Split(part, ",")
+								labelParts[len(labelParts)-1] += " " + substrings[0]
+								labelParts = append(labelParts, q.Keycodes[substrings[1]].Label)
+							} else {
+								labelParts = append(labelParts, part)
+							}
+						} else {
+							labelParts = append(labelParts, subCode.Label)
+						}
+					}
+					if len(labelParts) == 1 {
+						newKey.Keycap.Label = labelParts[0]
+					} else if len(labelParts) == 2 {
+						newKey.Keycap.Modifier = labelParts[0]
+						newKey.Keycap.Label = labelParts[1]
+					} else {
+						newKey.Keycap.Modifier = strings.Join(labelParts[:len(labelParts)-1], " ")
+						newKey.Keycap.Label = labelParts[len(labelParts)-1]
+					}
+				} else {
+					newKey.Keycap.Label = keycode.Label
+				}
+
+				if newKey.Keycap.Label == "Spacebar" {
+					newKey.Keycap.Label = "Space"
+				}
+				if newKey.Keycap.Label == "Backspace" {
+					newKey.Keycap.Label = "Back Space"
+				}
 			}
 
 			keys = append(keys, newKey)
-			if keyData.X*40.0 >= maxLeft {
-				maxLeft = keyData.X * 40.0
+			left := keyData.X*q.KeySize + newKey.W
+			if left >= maxLeft {
+				maxLeft = left
 			}
-			if keyData.Y*40.0 >= maxTop {
-				maxTop = keyData.Y * 40.0
+			top := keyData.Y*q.KeySize + newKey.H
+			if top >= maxTop {
+				maxTop = top
 			}
 		}
 	}
 
 	keyboard.Keys = keys
-	keyboard.Height = maxTop + 40.0 + 10.0
-	keyboard.Width = maxLeft + 40.0 + 10.0
+	keyboard.Height = maxTop + 10.0
+	keyboard.Width = maxLeft + 10.0
 
 	return keyboard, nil
 }

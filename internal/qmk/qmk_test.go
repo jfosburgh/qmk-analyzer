@@ -24,6 +24,12 @@ func Equal[T comparable](t *testing.T, expected, actual T) {
 	}
 }
 
+func GreaterThan(t *testing.T, expected, actual int) {
+	if expected >= actual {
+		t.Errorf("Expected %d to be greater than %d", actual, expected)
+	}
+}
+
 func ArrayEqual[T comparable](t *testing.T, expected, actual []T) {
 	Equal(t, len(expected), len(actual))
 
@@ -47,7 +53,7 @@ func MapContains[T any](t *testing.T, targetKey string, data map[string]T) {
 }
 
 func TestFindKeyboards(t *testing.T) {
-	q, err := NewQMKHelper("./test_content/keyboards", "./test_content/layouts")
+	q, err := NewQMKHelper("./test_content/keyboards", "./test_content/layouts", "./test_content/keycodes")
 	NoError(t, err)
 
 	keyboards, err := q.GetAllKeyboardNames()
@@ -153,4 +159,28 @@ func TestKeyboardWithoutKeymapJSON(t *testing.T) {
 		"LAYOUT_1x2uL",
 	}
 	ArrayEqual(t, expectedLayouts, keyboard.GetLayouts())
+}
+
+func TestFindKeycodeJSONs(t *testing.T) {
+	jsons, err := FindKeycodeJSONs("./test_content/keycodes/")
+	NoError(t, err)
+
+	expectedJSONs := []string{
+		"test_content/keycodes/keycodes_0.0.1_audio.hjson",
+		"test_content/keycodes/keycodes_0.0.1_basic.hjson",
+		"test_content/keycodes/keycodes_0.0.1_midi.hjson",
+		"test_content/keycodes/keycodes_0.0.2_kb.hjson",
+	}
+
+	ArrayEqual(t, expectedJSONs, jsons)
+}
+
+func TestLoadKeycodeJSONs(t *testing.T) {
+	jsons, err := FindKeycodeJSONs("./test_content/keycodes/")
+	NoError(t, err)
+
+	keycodes, err := LoadKeycodesFromJSONs(jsons)
+	NoError(t, err)
+
+	GreaterThan(t, 0, len(keycodes))
 }

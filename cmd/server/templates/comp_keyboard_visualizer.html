@@ -1,11 +1,18 @@
 <div class="visualizer" id="visualizer">
-	<h2>{{.Name}}</h2>
-	<h3>{{.Layout}}</h3>
+	<form id="layerselect-form" hx-post="/layerselect" hx-include="#keyboardselect-form, #layoutselect-form"
+		hx-target="#visualizer" hx-swap="outerHTML" hx-trigger="change">
+		Layer {{.CurrentLayer}}
+		{{ range .Layers }}
+		<input type="radio" name="layer" value="{{.}}" {{ if eq . $.CurrentLayer}}checked{{end}}>
+		{{ end }}
+	</form>
 	<div class="keyboard-container" style="width: {{.Width}}px; height: {{.Height}}px;">
 		{{ range .Keys }}
 		<div class="key-container" style="top: {{.Y}}px; left: {{.X}}px; width: {{.W}}px; height: {{.H}}px;">
-			<div class="key">
-				{{.Keycap.Raw}}
+			<div class="key" style="font-size: {{.Keycap.MainSize}}px;">
+				{{if .Keycap.Modifier }}<p style="font-size: {{.Keycap.ModifierSize}}px;">{{.Keycap.Modifier}}</p>
+				{{end}}
+				{{.Keycap.Label}}
 			</div>
 		</div>
 		{{ end }}
