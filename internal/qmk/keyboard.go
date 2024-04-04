@@ -15,7 +15,8 @@ type KeyboardData struct {
 	LayoutAliases    struct {
 		Layout string `json:"LAYOUT"`
 	} `json:"layout_aliases"`
-	Layouts map[string]LayoutData `json:"layouts"`
+	Layouts       map[string]LayoutData `json:"layouts"`
+	DefaultKeymap KeymapData
 }
 
 type LayoutData struct {
@@ -33,15 +34,15 @@ type KeyData struct {
 func (k *KeyboardData) GetLayouts() []string {
 	layouts := []string{}
 
-	for layout, _ := range k.Layouts {
+	for layout := range k.Layouts {
 		layouts = append(layouts, layout)
 	}
 
 	return layouts
 }
 
-func LoadFromJSONs(jsonPaths []string, keyboardData *KeyboardData) error {
-	for _, jsonPath := range jsonPaths {
+func LoadFromJSONs(infoJSONPaths []string, keymapJSON string, keyboardData *KeyboardData) error {
+	for _, jsonPath := range infoJSONPaths {
 		f, err := os.Open(jsonPath)
 		defer f.Close()
 
@@ -54,7 +55,15 @@ func LoadFromJSONs(jsonPaths []string, keyboardData *KeyboardData) error {
 			return err
 		}
 
-		err = json.Unmarshal(b, &keyboardData)
+		err = json.Unmarshal(b, keyboardData)
+		if err != nil {
+			return err
+		}
+	}
+
+	if keymapJSON != "" {
+		keyboardData.DefaultKeymap = KeymapData{}
+		err := LoadKeymapFromJSON(keymapJSON, &keyboardData.DefaultKeymap)
 		if err != nil {
 			return err
 		}

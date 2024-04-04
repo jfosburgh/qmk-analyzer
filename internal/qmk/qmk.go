@@ -20,18 +20,24 @@ type QMKHelper struct {
 }
 
 type Keyboard struct {
-	Name   string
-	Layout string
-	Keys   []Key
-	Width  float64
-	Height float64
+	Name       string
+	Layout     string
+	Keys       []Key
+	LayerCount int
+	Width      float64
+	Height     float64
 }
 
 type Key struct {
-	X float64
-	Y float64
-	W float64
-	H float64
+	X      float64
+	Y      float64
+	W      float64
+	H      float64
+	Keycap KeyCap
+}
+
+type KeyCap struct {
+	Raw string
 }
 
 type KeyboardCache map[string]KeyboardCacheEntry
@@ -134,7 +140,9 @@ func (q *QMKHelper) GetKeyboardData(keyboard string) (KeyboardData, error) {
 			return keyboardData, err
 		}
 
-		err = LoadFromJSONs(jsons, &keyboardData)
+		keymapJSON, err := FindKeymapJSON(q.KeyboardDir, keyboard)
+
+		err = LoadFromJSONs(jsons, keymapJSON, &keyboardData)
 		if err != nil {
 			return keyboardData, err
 		}
@@ -162,7 +170,7 @@ func (q *QMKHelper) GetLayoutsForKeyboard(keyboard string) ([]string, error) {
 	return keyboardData.GetLayouts(), nil
 }
 
-func (q *QMKHelper) GetKeyboard(keyboardName, layoutName string) (Keyboard, error) {
+func (q *QMKHelper) GetKeyboard(keyboardName, layoutName string, layer int) (Keyboard, error) {
 	keys := []Key{}
 
 	keyboard := Keyboard{
@@ -175,20 +183,37 @@ func (q *QMKHelper) GetKeyboard(keyboardName, layoutName string) (Keyboard, erro
 		return keyboard, err
 	}
 
+	if keyboardData.DefaultKeymap.Layers != nil {
+		keyboard.LayerCount = len(keyboardData.DefaultKeymap.Layers)
+	}
+
+	if keyboard.LayerCount > 0 && layer >= keyboard.LayerCount {
+		return keyboard, errors.New(fmt.Sprintf("layer %d does not exist for %s with %d layers", layer, keyboardName, keyboard.LayerCount))
+	}
+
 	maxTop := 0.0
 	maxLeft := 0.0
 
 	layout, ok := keyboardData.Layouts[layoutName]
 	if !ok {
 		return keyboard, errors.New(fmt.Sprintf("Could not find layout %s in layout map for keyboard %s", layoutName, keyboardName))
+	} else if keyboard.LayerCount > 0 && len(layout.Layout) != len(keyboardData.DefaultKeymap.Layers[0]) {
+		return keyboard, errors.New(fmt.Sprintf("layer %d does not exist for %s with %d layers", layer, keyboardName, keyboard.LayerCount))
 	} else {
-		for _, keyData := range layout.Layout {
-			keys = append(keys, Key{
-				X: keyData.X*40.0 + 5.0,
-				Y: keyData.Y*40.0 + 5.0,
-				W: max(40.0, keyData.W*40.0),
-				H: max(40.0, keyData.H*40.0),
-			})
+		for i, keyData := range layout.Layout {
+			newKey := Key{
+				X:      keyData.X*40.0 + 5.0,
+				Y:      keyData.Y*40.0 + 5.0,
+				W:      max(40.0, keyData.W*40.0),
+				H:      max(40.0, keyData.H*40.0),
+				Keycap: KeyCap{},
+			}
+
+			if keyboard.LayerCount > 0 {
+				newKey.Keycap.Raw = keyboardData.DefaultKeymap.Layers[layer][i]
+			}
+
+			keys = append(keys, newKey)
 			if keyData.X*40.0 >= maxLeft {
 				maxLeft = keyData.X * 40.0
 			}

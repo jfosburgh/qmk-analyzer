@@ -5,6 +5,7 @@
 		{{ range .Keys }}
 		<div class="key-container" style="top: {{.Y}}px; left: {{.X}}px; width: {{.W}}px; height: {{.H}}px;">
 			<div class="key">
+				{{.Keycap.Raw}}
 			</div>
 		</div>
 		{{ end }}

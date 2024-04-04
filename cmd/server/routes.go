@@ -67,7 +67,7 @@ func (app *application) hanldeLayoutSelect(w http.ResponseWriter, r *http.Reques
 		layoutName = layoutChoices[0]
 	}
 
-	keyboard, err := app.qmkHelper.GetKeyboard(keyboardName, layoutName)
+	keyboard, err := app.qmkHelper.GetKeyboard(keyboardName, layoutName, 0)
 	if err != nil {
 		w.WriteHeader(500)
 		app.logger.Error(err.Error())
@@ -114,7 +114,7 @@ func (app *application) handleIndex(w http.ResponseWriter, r *http.Request) {
 		Trigger:    "load, change",
 	}
 
-	keyboard, err := app.qmkHelper.GetKeyboard(keyboardOptions.Selected, layoutOptions.Selected)
+	keyboard, err := app.qmkHelper.GetKeyboard(keyboardOptions.Selected, layoutOptions.Selected, 0)
 	if err != nil {
 		w.WriteHeader(500)
 		app.logger.Error(err.Error())

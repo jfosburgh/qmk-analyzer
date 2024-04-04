@@ -1,6 +1,7 @@
 package qmk
 
 import (
+	"errors"
 	"slices"
 	"testing"
 )
@@ -8,6 +9,12 @@ import (
 func NoError(t *testing.T, err error) {
 	if err != nil {
 		t.Errorf("Expected no error but got %s", err.Error())
+	}
+}
+
+func ErrorEqual(t *testing.T, expected, actual error) {
+	if expected.Error() != actual.Error() {
+		t.Errorf("Expected '%s', got '%s'", expected.Error(), actual.Error())
 	}
 }
 
@@ -74,12 +81,34 @@ func TestFindInfoJSONs(t *testing.T) {
 	ArrayEqual(t, expectedJSONs, jsons)
 }
 
+func TestFindKeymapJSON(t *testing.T) {
+	keymap, err := FindKeymapJSON("./test_content/keyboards/", "ferris/sweep")
+	NoError(t, err)
+
+	expectedJSON := "test_content/keyboards/ferris/keymaps/default/keymap.json"
+	Equal(t, expectedJSON, keymap)
+}
+
+func TestLoadKeymap(t *testing.T) {
+	keymapJSON := "test_content/keyboards/ferris/keymaps/default/keymap.json"
+	keymapData := KeymapData{}
+
+	err := LoadKeymapFromJSON(keymapJSON, &keymapData)
+	NoError(t, err)
+
+	Equal(t, 8, len(keymapData.Layers))
+	Equal(t, 34, len(keymapData.Layers[0]))
+}
+
 func TestLoadKeyboardFromJSONs(t *testing.T) {
 	jsons, err := FindInfoJSONs("./test_content/keyboards/", "ferris/sweep")
 	NoError(t, err)
 
+	keymap, err := FindKeymapJSON("./test_content/keyboards/", "ferris/sweep")
+	NoError(t, err)
+
 	keyboard := KeyboardData{}
-	err = LoadFromJSONs(jsons, &keyboard)
+	err = LoadFromJSONs(jsons, keymap, &keyboard)
 	NoError(t, err)
 
 	Equal(t, "Ferris sweep", keyboard.KeyboardName)
@@ -90,20 +119,28 @@ func TestLoadKeyboardFromJSONs(t *testing.T) {
 	jsons, err = FindInfoJSONs("./test_content/keyboards/", "ferris/0_2/bling")
 	NoError(t, err)
 
+	keymap, err = FindKeymapJSON("./test_content/keyboards/", "ferris/0_2/bling")
+	NoError(t, err)
+
 	keyboard = KeyboardData{}
-	err = LoadFromJSONs(jsons, &keyboard)
+	err = LoadFromJSONs(jsons, keymap, &keyboard)
 	NoError(t, err)
 
 	Equal(t, "Ferris 0.2 - Bling", keyboard.KeyboardName)
 	MapContains(t, "LAYOUT_split_3x5_2", keyboard.Layouts)
 
 	ArrayEqual(t, []string{"LAYOUT_split_3x5_2"}, keyboard.GetLayouts())
+}
 
-	jsons, err = FindInfoJSONs("./test_content/keyboards/", "0_sixty/base")
+func TestKeyboardWithoutKeymapJSON(t *testing.T) {
+	jsons, err := FindInfoJSONs("./test_content/keyboards/", "0_sixty/base")
 	NoError(t, err)
 
-	keyboard = KeyboardData{}
-	err = LoadFromJSONs(jsons, &keyboard)
+	keymap, err := FindKeymapJSON("./test_content/keyboards/", "0_sixty/base")
+	ErrorEqual(t, errors.New("no default keymap json found"), err)
+
+	keyboard := KeyboardData{}
+	err = LoadFromJSONs(jsons, keymap, &keyboard)
 	NoError(t, err)
 
 	Equal(t, "0-Sixty", keyboard.KeyboardName)
