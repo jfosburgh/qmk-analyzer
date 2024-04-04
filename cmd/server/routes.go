@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/rand"
 	"embed"
 	"encoding/json"
 	"expvar"
@@ -91,13 +92,17 @@ func (app *application) hanldeLayoutSelect(w http.ResponseWriter, r *http.Reques
 func (app *application) handleLayerSelect(w http.ResponseWriter, r *http.Request) {
 	layoutName := r.FormValue("layoutselect")
 	keyboardName := r.FormValue("keyboardselect")
+	keymap := r.FormValue("keymapselect")
 	layer, err := strconv.Atoi(r.FormValue("layer"))
+
 	if err != nil {
 		w.WriteHeader(500)
 		app.logger.Error(err.Error())
 	}
 
-	keyboard, err := app.qmkHelper.GetKeyboard(keyboardName, layoutName, layer, false)
+	customKeymap := keymap != ""
+
+	keyboard, err := app.qmkHelper.GetKeyboard(keyboardName, layoutName, layer, customKeymap)
 	if err != nil {
 		w.WriteHeader(500)
 		app.logger.Error(err.Error())
@@ -110,7 +115,7 @@ func (app *application) handleLayerSelect(w http.ResponseWriter, r *http.Request
 	}
 }
 
-func (app *application) handleKeymapUploatd(w http.ResponseWriter, r *http.Request) {
+func (app *application) handleKeymapUpload(w http.ResponseWriter, r *http.Request) {
 	r.ParseMultipartForm(1 << 20)
 
 	f, handler, err := r.FormFile("keymap-file")
@@ -148,6 +153,18 @@ func (app *application) handleKeymapUploatd(w http.ResponseWriter, r *http.Reque
 		w.WriteHeader(http.StatusBadRequest)
 		app.logger.Error(err.Error())
 		return
+	}
+
+	if app.cfg.saveKeymapUploads {
+		name := make([]byte, 16)
+		_, err := rand.Read(name)
+		if err != nil {
+			w.WriteHeader(500)
+			app.logger.Error(err.Error())
+			return
+		}
+
+		app.qmkHelper.SaveKeymap(keymapData.Keyboard, fmt.Sprintf("%x.json", name), bytes)
 	}
 
 	keyboard, err := app.qmkHelper.GetKeyboard(keymapData.Keyboard, keymapData.Layout, 0, true)
@@ -289,7 +306,7 @@ func (app *application) routes() http.Handler {
 	handler.HandleFunc("POST /layoutselect", app.hanldeLayoutSelect)
 	handler.HandleFunc("POST /keyboardselect", app.handleKeyboardSelect)
 	handler.HandleFunc("POST /layerselect", app.handleLayerSelect)
-	handler.HandleFunc("POST /keymap/upload", app.handleKeymapUploatd)
+	handler.HandleFunc("POST /keymap/upload", app.handleKeymapUpload)
 
 	return app.metrics(app.recoverPanic(app.enableCORS(app.rateLimit(handler))))
 }

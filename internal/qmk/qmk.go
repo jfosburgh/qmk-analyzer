@@ -14,6 +14,7 @@ import (
 type QMKHelper struct {
 	KeyboardDir   string
 	LayoutDir     string
+	KeymapDir     string
 	Keycodes      map[string]Keycode
 	KeyboardCache KeyboardCache
 	Lock          sync.Mutex
@@ -84,7 +85,7 @@ func findKeyboardsRecursive(base, sourceDir string) ([]string, error) {
 	return names, nil
 }
 
-func NewQMKHelper(keyboardDir, layoutDir, keycodeDir string) (*QMKHelper, error) {
+func NewQMKHelper(keyboardDir, layoutDir, keymapDir, keycodeDir string) (*QMKHelper, error) {
 	if _, err := os.Stat(keyboardDir); os.IsNotExist(err) {
 		return &QMKHelper{}, fmt.Errorf("folder does not exist")
 	} else if err != nil {
@@ -92,6 +93,12 @@ func NewQMKHelper(keyboardDir, layoutDir, keycodeDir string) (*QMKHelper, error)
 	}
 
 	if _, err := os.Stat(layoutDir); os.IsNotExist(err) {
+		return &QMKHelper{}, fmt.Errorf("folder does not exist")
+	} else if err != nil {
+		return &QMKHelper{}, err
+	}
+
+	if _, err := os.Stat(keymapDir); os.IsNotExist(err) {
 		return &QMKHelper{}, fmt.Errorf("folder does not exist")
 	} else if err != nil {
 		return &QMKHelper{}, err
@@ -109,6 +116,10 @@ func NewQMKHelper(keyboardDir, layoutDir, keycodeDir string) (*QMKHelper, error)
 
 	if !strings.HasSuffix(layoutDir, "/") {
 		layoutDir += "/"
+	}
+
+	if !strings.HasSuffix(keymapDir, "/") {
+		keymapDir += "/"
 	}
 
 	if !strings.HasSuffix(keycodeDir, "/") {
@@ -133,6 +144,7 @@ func NewQMKHelper(keyboardDir, layoutDir, keycodeDir string) (*QMKHelper, error)
 	q := &QMKHelper{
 		KeyboardDir:   strings.TrimPrefix(keyboardDir, "./"),
 		LayoutDir:     strings.TrimPrefix(layoutDir, "./"),
+		KeymapDir:     strings.TrimPrefix(keymapDir, "./"),
 		Keycodes:      keycodes,
 		KeyboardCache: make(KeyboardCache),
 		Lock:          sync.Mutex{},

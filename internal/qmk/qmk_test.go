@@ -53,7 +53,7 @@ func MapContains[T any](t *testing.T, targetKey string, data map[string]T) {
 }
 
 func TestFindKeyboards(t *testing.T) {
-	q, err := NewQMKHelper("./test_content/keyboards", "./test_content/layouts", "./test_content/keycodes")
+	q, err := NewQMKHelper("./test_content/keyboards", "./test_content/layouts", "./test_content/keymaps", "./test_content/keycodes")
 	NoError(t, err)
 
 	keyboards, err := q.GetAllKeyboardNames()
