@@ -3,10 +3,10 @@
 	<label for="{{.Name}}">{{.Label}}</label>
 	<select name="{{.Name}}">
 		{{ range .Options }}
-		{{ if eq $.Selected . }}
-		<option selected="selected" value="{{.}}">{{.}}</option>
+		{{ if eq $.Selected .Name }}
+		<option selected="selected" value="{{.ID}}">{{.Name}}</option>
 		{{ else }}
-		<option value="{{.}}">{{.}}</option>
+		<option value="{{.ID}}">{{.Name}}</option>
 		{{ end }}
 		{{ end }}
 	</select>

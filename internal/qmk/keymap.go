@@ -159,7 +159,9 @@ func FindKeymapJSON(rootPath, keyboard string) (string, error) {
 func FindCustomKeymaps(keymapPath string) ([]string, error) {
 	keymapJSONs := []string{}
 
-	if _, err := os.Stat(keymapPath); err != nil {
+	if _, err := os.Stat(keymapPath); os.IsNotExist(err) {
+		return keymapJSONs, nil
+	} else if err != nil {
 		return keymapJSONs, err
 	}
 
@@ -179,27 +181,27 @@ func FindCustomKeymaps(keymapPath string) ([]string, error) {
 	return keymapJSONs, nil
 }
 
-func (q *QMKHelper) SaveKeymap(keyboard, name string, data []byte) error {
-	saveDir := path.Join(q.KeymapDir, keyboard)
+func (q *QMKHelper) SaveKeymap(layout, name string, data []byte) (string, error) {
+	saveDir := path.Join(q.KeymapDir, layout)
 	os.MkdirAll(saveDir, 0755)
 
 	filePath := path.Join(saveDir, name)
 
 	_, err := os.Stat(filePath)
 	if !os.IsNotExist(err) {
-		return errors.New(fmt.Sprintf("%s already exists", filePath))
+		return "", errors.New(fmt.Sprintf("%s already exists", filePath))
 	}
 
 	f, err := os.Create(filePath)
 	defer f.Close()
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	_, err = f.Write(data)
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	return nil
+	return filePath, nil
 }

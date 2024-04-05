@@ -10,8 +10,8 @@ import (
 	"io"
 	"net/http"
 	"path/filepath"
-	"slices"
 	"strconv"
+	"time"
 
 	"github.com/qmk-analyzer/internal/qmk"
 )
@@ -21,14 +21,43 @@ var (
 	css embed.FS
 )
 
+type SelectOption struct {
+	Name string
+	ID   string
+}
+
 type selectOptions struct {
 	Selected   string
-	Options    []string
+	Options    []SelectOption
 	Name       string
 	Label      string
 	SwapTarget string
 	Include    string
 	Trigger    string
+}
+
+func toSelectOptions(inputs []string) []SelectOption {
+	outputs := []SelectOption{}
+	for _, input := range inputs {
+		outputs = append(outputs, SelectOption{
+			Name: input,
+			ID:   input,
+		})
+	}
+
+	return outputs
+}
+
+func convertOptions(inputs []qmk.KeymapOption) []SelectOption {
+	outputs := []SelectOption{}
+	for _, input := range inputs {
+		outputs = append(outputs, SelectOption{
+			Name: input.Name,
+			ID:   input.ID,
+		})
+	}
+
+	return outputs
 }
 
 func (app *application) handleKeyboardSelect(w http.ResponseWriter, r *http.Request) {
@@ -43,10 +72,10 @@ func (app *application) handleKeyboardSelect(w http.ResponseWriter, r *http.Requ
 
 	layoutOptions := selectOptions{
 		Selected:   layoutNames[0],
-		Options:    layoutNames,
+		Options:    toSelectOptions(layoutNames),
 		Name:       "layoutselect",
 		Label:      "Layout",
-		SwapTarget: "visualizer",
+		SwapTarget: "keymapselect-form",
 		Include:    "#keyboardselect-form, #layerselect-form",
 		Trigger:    "load, change",
 	}
@@ -60,23 +89,46 @@ func (app *application) handleKeyboardSelect(w http.ResponseWriter, r *http.Requ
 
 func (app *application) hanldeLayoutSelect(w http.ResponseWriter, r *http.Request) {
 	layoutName := r.FormValue("layoutselect")
+	keymaps, err := app.qmkHelper.GetCustomKeymapsForLayouts(layoutName)
+	if err != nil {
+		w.WriteHeader(500)
+		app.logger.Error(err.Error())
+		return
+	}
+
+	converted := convertOptions(keymaps)
+	converted = append(converted, SelectOption{
+		Name: "default",
+		ID:   "default",
+	})
+
+	keymapOptions := selectOptions{
+		Selected:   "default",
+		Options:    converted,
+		Name:       "keymapselect",
+		Label:      "Keymap",
+		SwapTarget: "visualizer",
+		Include:    "#keyboardselect-form, #layerselect-form, #layoutselect-form",
+		Trigger:    "load, change",
+	}
+
+	err = app.templates.ExecuteTemplate(w, "comp_select.html", keymapOptions)
+	if err != nil {
+		w.WriteHeader(500)
+		app.logger.Error(err.Error())
+	}
+}
+
+func (app *application) handleKeymapSelect(w http.ResponseWriter, r *http.Request) {
+	layoutName := r.FormValue("layoutselect")
 	keyboardName := r.FormValue("keyboardselect")
+	keymap := r.FormValue("keymapselect")
 	layer, err := strconv.Atoi(r.FormValue("layer"))
 	if err != nil {
 		layer = 0
 	}
 
-	layoutChoices, err := app.qmkHelper.GetLayoutsForKeyboard(keyboardName)
-	if err != nil {
-		w.WriteHeader(500)
-		app.logger.Error(err.Error())
-	}
-
-	if !slices.Contains(layoutChoices, layoutName) {
-		layoutName = layoutChoices[0]
-	}
-
-	keyboard, err := app.qmkHelper.GetKeyboard(keyboardName, layoutName, layer, false)
+	keyboard, err := app.qmkHelper.GetKeyboard(keyboardName, layoutName, layer, keymap)
 	if err != nil {
 		w.WriteHeader(500)
 		app.logger.Error(err.Error())
@@ -100,9 +152,7 @@ func (app *application) handleLayerSelect(w http.ResponseWriter, r *http.Request
 		app.logger.Error(err.Error())
 	}
 
-	customKeymap := keymap != ""
-
-	keyboard, err := app.qmkHelper.GetKeyboard(keyboardName, layoutName, layer, customKeymap)
+	keyboard, err := app.qmkHelper.GetKeyboard(keyboardName, layoutName, layer, keymap)
 	if err != nil {
 		w.WriteHeader(500)
 		app.logger.Error(err.Error())
@@ -155,6 +205,8 @@ func (app *application) handleKeymapUpload(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	keymapKey := keymapData.Keymap
+
 	if app.cfg.saveKeymapUploads {
 		name := make([]byte, 16)
 		_, err := rand.Read(name)
@@ -164,17 +216,15 @@ func (app *application) handleKeymapUpload(w http.ResponseWriter, r *http.Reques
 			return
 		}
 
-		app.qmkHelper.SaveKeymap(keymapData.Keyboard, fmt.Sprintf("%x.json", name), bytes)
+		keymapKey, err = app.qmkHelper.SaveKeymap(keymapData.Layout, fmt.Sprintf("%x.json", name), bytes)
 	}
 
-	keyboard, err := app.qmkHelper.GetKeyboard(keymapData.Keyboard, keymapData.Layout, 0, true)
-	if err != nil {
-		w.WriteHeader(500)
-		app.logger.Error(err.Error())
-		return
+	app.qmkHelper.KeymapCache[keymapKey] = qmk.KeymapCacheEntry{
+		Keymap:     keymapData,
+		LastViewed: time.Now(),
 	}
 
-	err = app.qmkHelper.ApplyKeymap(&keyboard, keymapData, 0)
+	keyboard, err := app.qmkHelper.GetKeyboard(keymapData.Keyboard, keymapData.Layout, 0, keymapKey)
 	if err != nil {
 		w.WriteHeader(500)
 		app.logger.Error(err.Error())
@@ -190,7 +240,7 @@ func (app *application) handleKeymapUpload(w http.ResponseWriter, r *http.Reques
 
 	keyboardOptions := selectOptions{
 		Selected:   keymapData.Keyboard,
-		Options:    keyboardNames,
+		Options:    toSelectOptions(keyboardNames),
 		Name:       "keyboardselect",
 		Label:      "Keyboard",
 		SwapTarget: "layoutselect-form",
@@ -206,17 +256,35 @@ func (app *application) handleKeymapUpload(w http.ResponseWriter, r *http.Reques
 
 	layoutOptions := selectOptions{
 		Selected:   keymapData.Layout,
-		Options:    layoutNames,
+		Options:    toSelectOptions(layoutNames),
 		Name:       "layoutselect",
 		Label:      "Layout",
-		SwapTarget: "visualizer",
+		SwapTarget: "keymapselect-form",
 		Include:    "#keyboardselect-form, #layerselect-form",
+		Trigger:    "change",
+	}
+
+	keymaps, err := app.qmkHelper.GetCustomKeymapsForLayouts(layoutOptions.Selected)
+	if err != nil {
+		w.WriteHeader(500)
+		app.logger.Error(err.Error())
+		return
+	}
+
+	keymapOptions := selectOptions{
+		Selected:   "default",
+		Options:    convertOptions(keymaps),
+		Name:       "keymapselect",
+		Label:      "Keymap",
+		SwapTarget: "visualizer",
+		Include:    "#keyboardselect-form, #layerselect-form, #layoutselect-form",
 		Trigger:    "change",
 	}
 
 	type templateData struct {
 		KeyboardSelectOptions selectOptions
 		LayoutSelectOptions   selectOptions
+		KeymapSelectOptions   selectOptions
 		Keyboard              qmk.Keyboard
 	}
 
@@ -224,6 +292,7 @@ func (app *application) handleKeymapUpload(w http.ResponseWriter, r *http.Reques
 		KeyboardSelectOptions: keyboardOptions,
 		Keyboard:              keyboard,
 		LayoutSelectOptions:   layoutOptions,
+		KeymapSelectOptions:   keymapOptions,
 	}
 
 	err = app.templates.ExecuteTemplate(w, "index.html", data)
@@ -243,47 +312,34 @@ func (app *application) handleIndex(w http.ResponseWriter, r *http.Request) {
 
 	keyboardOptions := selectOptions{
 		Selected:   keyboardNames[0],
-		Options:    keyboardNames,
+		Options:    toSelectOptions(keyboardNames),
 		Name:       "keyboardselect",
 		Label:      "Keyboard",
 		SwapTarget: "layoutselect-form",
 		Trigger:    "load, change",
 	}
 
-	layoutNames, err := app.qmkHelper.GetLayoutsForKeyboard(keyboardNames[0])
-	if err != nil {
-		w.WriteHeader(500)
-		app.logger.Error(err.Error())
-		return
-	}
-
 	layoutOptions := selectOptions{
-		Selected:   layoutNames[0],
-		Options:    layoutNames,
-		Name:       "layoutselect",
-		Label:      "Layout",
-		SwapTarget: "visualizer",
-		Include:    "#keyboardselect-form, #layerselect-form",
-		Trigger:    "change",
+		Name:  "layoutselect",
+		Label: "Layout",
 	}
 
-	keyboard, err := app.qmkHelper.GetKeyboard(keyboardOptions.Selected, layoutOptions.Selected, 0, false)
-	if err != nil {
-		w.WriteHeader(500)
-		app.logger.Error(err.Error())
-		return
+	keymapOptions := selectOptions{
+		Name:  "keymapselect",
+		Label: "Keymap",
 	}
 
 	type templateData struct {
 		KeyboardSelectOptions selectOptions
 		LayoutSelectOptions   selectOptions
+		KeymapSelectOptions   selectOptions
 		Keyboard              qmk.Keyboard
 	}
 
 	data := templateData{
 		KeyboardSelectOptions: keyboardOptions,
-		Keyboard:              keyboard,
 		LayoutSelectOptions:   layoutOptions,
+		KeymapSelectOptions:   keymapOptions,
 	}
 
 	err = app.templates.ExecuteTemplate(w, "base.html", data)
@@ -306,6 +362,7 @@ func (app *application) routes() http.Handler {
 	handler.HandleFunc("POST /layoutselect", app.hanldeLayoutSelect)
 	handler.HandleFunc("POST /keyboardselect", app.handleKeyboardSelect)
 	handler.HandleFunc("POST /layerselect", app.handleLayerSelect)
+	handler.HandleFunc("POST /keymapselect", app.handleKeymapSelect)
 	handler.HandleFunc("POST /keymap/upload", app.handleKeymapUpload)
 
 	return app.metrics(app.recoverPanic(app.enableCORS(app.rateLimit(handler))))

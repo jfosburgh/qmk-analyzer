@@ -1,6 +1,8 @@
 <div class="visualizer" id="visualizer">
-	<form id="layerselect-form" hx-post="/layerselect" hx-include="#keyboardselect-form, #layoutselect-form"
-		hx-target="#visualizer" hx-swap="outerHTML" hx-trigger="change">
+	{{ if . }}
+	<form id="layerselect-form" hx-post="/layerselect"
+		hx-include="#keyboardselect-form, #layoutselect-form, #keymapselect-form" hx-target="#visualizer"
+		hx-swap="outerHTML" hx-trigger="change">
 		Layer {{.CurrentLayer}}
 		{{ range .Layers }}
 		<input type="radio" name="layer" value="{{.}}" {{ if eq . $.CurrentLayer}}checked{{end}}>
@@ -17,4 +19,5 @@
 		</div>
 		{{ end }}
 	</div>
+	{{ end }}
 </div>

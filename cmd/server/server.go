@@ -49,13 +49,14 @@ func (app *application) serve() error {
 		for {
 			select {
 			case <-app.qmkHelper.Shutdown:
-				app.logger.Debug("shutting down keyboardcache pruning background process")
+				app.logger.Debug("shutting down cache pruning background process")
 				app.qmkHelper.Ticker.Stop()
 				return
 			case <-app.qmkHelper.Ticker.C:
 				app.wg.Add(1)
-				app.logger.Debug("pruning keyboardcache")
+				app.logger.Debug("pruning caches")
 				app.qmkHelper.PruneKeyboardCache(time.Minute)
+				app.qmkHelper.PruneKeymapCache(time.Minute)
 				app.wg.Done()
 			}
 		}
