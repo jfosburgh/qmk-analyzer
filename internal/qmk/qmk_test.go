@@ -30,12 +30,22 @@ func GreaterThan(t *testing.T, expected, actual int) {
 	}
 }
 
-func ArrayEqual[T comparable](t *testing.T, expected, actual []T) {
+func ArrayEqualUnordered[T comparable](t *testing.T, expected, actual []T) {
 	Equal(t, len(expected), len(actual))
 
 	if len(expected) == len(actual) {
 		for i := range len(expected) {
 			ArrayContains(t, expected[i], actual)
+		}
+	}
+}
+
+func ArrayEqual[T comparable](t *testing.T, expected, actual []T) {
+	Equal(t, len(expected), len(actual))
+
+	if len(expected) == len(actual) {
+		for i := range len(expected) {
+			Equal(t, expected[i], actual[i])
 		}
 	}
 }
@@ -72,7 +82,7 @@ func TestFindKeyboards(t *testing.T) {
 		"ferris/sweep",
 	}
 
-	ArrayEqual(t, expected_keyboards, keyboards)
+	ArrayEqualUnordered(t, expected_keyboards, keyboards)
 }
 
 func TestFindInfoJSONs(t *testing.T) {
@@ -84,7 +94,7 @@ func TestFindInfoJSONs(t *testing.T) {
 		"test_content/keyboards/ferris/sweep/info.json",
 	}
 
-	ArrayEqual(t, expectedJSONs, jsons)
+	ArrayEqualUnordered(t, expectedJSONs, jsons)
 }
 
 func TestFindKeymapJSON(t *testing.T) {
@@ -96,7 +106,7 @@ func TestFindKeymapJSON(t *testing.T) {
 }
 
 func TestLoadKeymap(t *testing.T) {
-	keymapJSON := "test_content/keyboards/ferris/keymaps/default/keymap.json"
+	keymapJSON := "./test_content/keymaps/ferris-sweep-reimagined.json"
 	keymapData := KeymapData{}
 
 	err := LoadKeymapFromJSON(keymapJSON, &keymapData)
@@ -104,6 +114,9 @@ func TestLoadKeymap(t *testing.T) {
 
 	Equal(t, 8, len(keymapData.Layers))
 	Equal(t, 34, len(keymapData.Layers[0]))
+
+	_, err = keymapData.ParseLayers()
+	NoError(t, err)
 }
 
 func TestLoadKeyboardFromJSONs(t *testing.T) {
@@ -120,7 +133,7 @@ func TestLoadKeyboardFromJSONs(t *testing.T) {
 	Equal(t, "Ferris sweep", keyboard.KeyboardName)
 	MapContains(t, "LAYOUT_split_3x5_2", keyboard.Layouts)
 
-	ArrayEqual(t, []string{"LAYOUT_split_3x5_2"}, keyboard.GetLayouts())
+	ArrayEqualUnordered(t, []string{"LAYOUT_split_3x5_2"}, keyboard.GetLayouts())
 
 	jsons, err = FindInfoJSONs("./test_content/keyboards/", "ferris/0_2/bling")
 	NoError(t, err)
@@ -135,7 +148,7 @@ func TestLoadKeyboardFromJSONs(t *testing.T) {
 	Equal(t, "Ferris 0.2 - Bling", keyboard.KeyboardName)
 	MapContains(t, "LAYOUT_split_3x5_2", keyboard.Layouts)
 
-	ArrayEqual(t, []string{"LAYOUT_split_3x5_2"}, keyboard.GetLayouts())
+	ArrayEqualUnordered(t, []string{"LAYOUT_split_3x5_2"}, keyboard.GetLayouts())
 }
 
 func TestKeyboardWithoutKeymapJSON(t *testing.T) {
@@ -158,7 +171,7 @@ func TestKeyboardWithoutKeymapJSON(t *testing.T) {
 		"LAYOUT_1x2uR",
 		"LAYOUT_1x2uL",
 	}
-	ArrayEqual(t, expectedLayouts, keyboard.GetLayouts())
+	ArrayEqualUnordered(t, expectedLayouts, keyboard.GetLayouts())
 }
 
 func TestFindKeycodeJSONs(t *testing.T) {
@@ -172,7 +185,7 @@ func TestFindKeycodeJSONs(t *testing.T) {
 		"test_content/keycodes/keycodes_0.0.2_kb.hjson",
 	}
 
-	ArrayEqual(t, expectedJSONs, jsons)
+	ArrayEqualUnordered(t, expectedJSONs, jsons)
 }
 
 func TestLoadKeycodeJSONs(t *testing.T) {

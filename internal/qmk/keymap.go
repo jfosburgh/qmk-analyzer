@@ -30,6 +30,21 @@ type Keycode struct {
 	Aliases []string `json:"aliases"`
 }
 
+func (km *KeymapData) ParseLayers() ([][]KC, error) {
+	layers := [][]KC{}
+
+	for _, layer := range km.Layers {
+		parsedLayer, err := ParseLayer(layer)
+		if err != nil {
+			return layers, err
+		}
+
+		layers = append(layers, parsedLayer)
+	}
+
+	return layers, nil
+}
+
 func LoadKeycodesFromJSONs(jsonPaths []string) (map[string]Keycode, error) {
 	keycodes := make(map[string]Keycode)
 	type KeycodeData struct {
