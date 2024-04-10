@@ -70,6 +70,24 @@ var (
 		"TRANSPARENT": {Default: "TRANS"},
 		"TRNS":        {Default: "TRANS"},
 
+		"UP":    {Default: "up"},
+		"DOWN":  {Default: "down"},
+		"LEFT":  {Default: "left"},
+		"RIGHT": {Default: "right"},
+		"RGHT":  {Default: "right"},
+
+		"HOME": {Default: "home"},
+		"END":  {Default: "end"},
+
+		"INSERT": {Default: "ins"},
+		"INS":    {Default: "ins"},
+
+		"PAGE_UP": {Default: "page up"},
+		"PGUP":    {Default: "page up"},
+
+		"PAGE_DOWN": {Default: "page down"},
+		"PGDN":      {Default: "page down"},
+
 		"TILDE": {Default: "~"},
 		"TILD":  {Default: "~"},
 

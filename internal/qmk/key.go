@@ -104,8 +104,26 @@ func (k *KeyQueue) Parse() (KC, error) {
 			}
 
 			key.Hold = fmt.Sprintf("layer-%d", layerInt)
+		} else if next == "MO" {
+			val := k.Pop()
+			if val != "_SP" {
+				return KC{}, errors.New("didn't find _SP after LT")
+			}
+			parenOpen += 1
+
+			val = k.Pop()
+			layerInt, err := strconv.Atoi(val)
+			if err != nil {
+				return KC{}, err
+			}
+
+			key.Hold = fmt.Sprintf("layer-%d", layerInt)
 		} else if next == "_SP" {
 			parenOpen += 1
+		} else if next == "QK" {
+			val := k.Pop()
+			key.Default += val
+			key.Shift += val
 		} else if next == "_EP" {
 			if strings.Contains(key.Default, "<") {
 				key.Default += ">"
