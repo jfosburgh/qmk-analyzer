@@ -112,7 +112,7 @@ func TestLoadKeymap(t *testing.T) {
 	err := LoadKeymapFromJSON(keymapJSON, &keymapData)
 	NoError(t, err)
 
-	Equal(t, 8, len(keymapData.Layers))
+	Equal(t, 4, len(keymapData.Layers))
 	Equal(t, 34, len(keymapData.Layers[0]))
 
 	_, err = keymapData.ParseLayers()

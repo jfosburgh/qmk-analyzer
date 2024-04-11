@@ -11,11 +11,13 @@
 	<div class="keyboard-container" style="width: {{.Width}}px; height: {{.Height}}px;">
 		{{ range .Keys }}
 		<div class="key-container" style="top: {{.Y}}px; left: {{.X}}px; width: {{.W}}px; height: {{.H}}px;">
-			<div class="key" style="font-size: {{.Keycap.MainSize}}px;">
-				{{if .Keycap.Modifier }}<p style="font-size: {{.Keycap.ModifierSize}}px;">{{.Keycap.Modifier}}</p>
-				{{end}}
-				{{.Keycap.Label}}
+			<div class="key">
+				{{if .Keycap.Shift}}<p style="font-size: {{.Keycap.MainSize}}px;">{{.Keycap.Shift}}</p>{{end}}
+				<p style="font-size: {{.Keycap.MainSize}}px;">{{.Keycap.Main}}</p>
 			</div>
+			{{if .Keycap.Hold }}
+			<p style="font-size: {{.Keycap.ModifierSize}}px;"> {{.Keycap.Hold}} </p>
+			{{end}}
 		</div>
 		{{ end }}
 	</div>

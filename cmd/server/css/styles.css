@@ -29,6 +29,14 @@ header>h1 {
 	position: absolute;
 }
 
+.key-container>p {
+	color: white;
+	position: absolute;
+	top: -12px;
+	left: 4px;
+	text-decoration: underline;
+}
+
 .key {
 	display: flex;
 	flex-direction: column;
@@ -45,6 +53,6 @@ header>h1 {
 }
 
 .key>p {
-	color: white;
-	margin: 0px;
+	margin: -3px;
+	text-align: center;
 }

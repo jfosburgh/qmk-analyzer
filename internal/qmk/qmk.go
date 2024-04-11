@@ -46,8 +46,9 @@ type Key struct {
 
 type KeyCap struct {
 	Raw          string
-	Label        string
-	Modifier     string
+	Main         string
+	Shift        string
+	Hold         string
 	MainSize     float64
 	ModifierSize float64
 }
@@ -310,46 +311,22 @@ func (q *QMKHelper) ApplyKeymap(keyboard *Keyboard, keymap KeymapData, layer int
 
 	for i := range len(keyboard.Keys) {
 		keyboard.Keys[i].Keycap.Raw = keymap.Layers[layer][i]
-		keycode, ok := q.Keycodes[keyboard.Keys[i].Keycap.Raw]
-
-		if !ok {
-			parts := strings.Split(keyboard.Keys[i].Keycap.Raw, "(")
-			parts[len(parts)-1] = strings.Split(parts[len(parts)-1], ")")[0]
-			labelParts := []string{}
-
-			for _, part := range parts {
-				subCode, subOk := q.Keycodes[part]
-
-				if !subOk {
-					if strings.Contains(part, ",") {
-						substrings := strings.Split(part, ",")
-						labelParts[len(labelParts)-1] += " " + substrings[0]
-						labelParts = append(labelParts, q.Keycodes[substrings[1]].Label)
-					} else {
-						labelParts = append(labelParts, part)
-					}
-				} else {
-					labelParts = append(labelParts, subCode.Label)
-				}
-			}
-			if len(labelParts) == 1 {
-				keyboard.Keys[i].Keycap.Label = labelParts[0]
-			} else if len(labelParts) == 2 {
-				keyboard.Keys[i].Keycap.Modifier = labelParts[0]
-				keyboard.Keys[i].Keycap.Label = labelParts[1]
-			} else {
-				keyboard.Keys[i].Keycap.Modifier = strings.Join(labelParts[:len(labelParts)-1], " ")
-				keyboard.Keys[i].Keycap.Label = labelParts[len(labelParts)-1]
-			}
+		queue := CreateQueue(keyboard.Keys[i].Keycap.Raw)
+		keycode, err := queue.Parse()
+		if err != nil {
+			keyboard.Keys[i].Keycap.Main = keyboard.Keys[i].Keycap.Raw
+			fmt.Printf("%+v\nUsing raw %s\n\n", err, keyboard.Keys[i].Keycap.Raw)
 		} else {
-			keyboard.Keys[i].Keycap.Label = keycode.Label
-		}
-
-		if keyboard.Keys[i].Keycap.Label == "Spacebar" {
-			keyboard.Keys[i].Keycap.Label = "Space"
-		}
-		if keyboard.Keys[i].Keycap.Label == "Backspace" {
-			keyboard.Keys[i].Keycap.Label = "Back Space"
+			keyboard.Keys[i].Keycap.Main = keycode.Default
+			if strings.ToLower(keycode.Default) == strings.ToLower(keycode.Shift) {
+				keyboard.Keys[i].Keycap.Main = keycode.Shift
+			} else {
+				keyboard.Keys[i].Keycap.Shift = keycode.Shift
+				keyboard.Keys[i].Keycap.MainSize *= 0.75
+			}
+			if strings.ToLower(keycode.Default) != strings.ToLower(keycode.Hold) {
+				keyboard.Keys[i].Keycap.Hold = keycode.Hold
+			}
 		}
 	}
 

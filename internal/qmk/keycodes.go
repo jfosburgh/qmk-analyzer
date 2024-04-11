@@ -54,8 +54,8 @@ var (
 		"ESCAPE": {Default: "esc"},
 		"ESC":    {Default: "esc"},
 
-		"BACKSPACE": {Default: "backspace"},
-		"BSPC":      {Default: "backspace"},
+		"BACKSPACE": {Default: "back space"},
+		"BSPC":      {Default: "back space"},
 
 		"SPACE": {Default: "space"},
 		"SPC":   {Default: "space"},
@@ -231,5 +231,18 @@ var (
 		"RALT":      {Default: "ralt"},
 		"ROPT":      {Default: "ralt"},
 		"RAGR":      {Default: "ralt"},
+
+		"F1":  {Default: "F1"},
+		"F2":  {Default: "F2"},
+		"F3":  {Default: "F3"},
+		"F4":  {Default: "F4"},
+		"F5":  {Default: "F5"},
+		"F6":  {Default: "F6"},
+		"F7":  {Default: "F7"},
+		"F8":  {Default: "F8"},
+		"F9":  {Default: "F9"},
+		"F10": {Default: "F10"},
+		"F11": {Default: "F11"},
+		"F12": {Default: "F12"},
 	}
 )

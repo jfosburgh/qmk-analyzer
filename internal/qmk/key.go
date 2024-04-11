@@ -103,7 +103,7 @@ func (k *KeyQueue) Parse() (KC, error) {
 				return KC{}, err
 			}
 
-			key.Hold = fmt.Sprintf("layer-%d", layerInt)
+			key.Hold = fmt.Sprintf("LT %d", layerInt)
 		} else if next == "MO" {
 			val := k.Pop()
 			if val != "_SP" {
@@ -117,7 +117,64 @@ func (k *KeyQueue) Parse() (KC, error) {
 				return KC{}, err
 			}
 
-			key.Hold = fmt.Sprintf("layer-%d", layerInt)
+			key.Hold = fmt.Sprintf("MO %d", layerInt)
+			key.Default = fmt.Sprintf("MO %d", layerInt)
+		} else if next == "TO" {
+			val := k.Pop()
+			if val != "_SP" {
+				return KC{}, errors.New("didn't find _SP after LT")
+			}
+			parenOpen += 1
+
+			val = k.Pop()
+			layerInt, err := strconv.Atoi(val)
+			if err != nil {
+				return KC{}, err
+			}
+
+			key.Default = fmt.Sprintf("TG %d", layerInt)
+		} else if next == "TG" {
+			val := k.Pop()
+			if val != "_SP" {
+				return KC{}, errors.New("didn't find _SP after LT")
+			}
+			parenOpen += 1
+
+			val = k.Pop()
+			layerInt, err := strconv.Atoi(val)
+			if err != nil {
+				return KC{}, err
+			}
+
+			key.Hold = fmt.Sprintf("TG %d", layerInt)
+		} else if next == "DF" {
+			val := k.Pop()
+			if val != "_SP" {
+				return KC{}, errors.New("didn't find _SP after LT")
+			}
+			parenOpen += 1
+
+			val = k.Pop()
+			layerInt, err := strconv.Atoi(val)
+			if err != nil {
+				return KC{}, err
+			}
+
+			key.Hold = fmt.Sprintf("DF %d", layerInt)
+		} else if next == "OSL" {
+			val := k.Pop()
+			if val != "_SP" {
+				return KC{}, errors.New("didn't find _SP after LT")
+			}
+			parenOpen += 1
+
+			val = k.Pop()
+			layerInt, err := strconv.Atoi(val)
+			if err != nil {
+				return KC{}, err
+			}
+
+			key.Default = fmt.Sprintf("OS %d", layerInt)
 		} else if next == "_SP" {
 			parenOpen += 1
 		} else if next == "QK" {
@@ -125,10 +182,10 @@ func (k *KeyQueue) Parse() (KC, error) {
 			key.Default += val
 			key.Shift += val
 		} else if next == "_EP" {
-			if strings.Contains(key.Default, "<") {
+			if strings.Contains(key.Default, "<") && key.Default != "<" {
 				key.Default += ">"
 			}
-			if strings.Contains(key.Shift, "<") {
+			if strings.Contains(key.Shift, "<") && key.Shift != "<" {
 				key.Shift += ">"
 			}
 			parenOpen -= 1
