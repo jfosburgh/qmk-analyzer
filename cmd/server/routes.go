@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"slices"
+	"strconv"
 
 	"github.com/qmk-analyzer/internal/qmk"
 )
@@ -73,6 +74,36 @@ func getRandomFilename(extension string) (string, error) {
 	_, err := rand.Read(name)
 
 	return fmt.Sprintf("%x%s", name, extension), err
+}
+
+func (app *application) handleLayerSelect(w http.ResponseWriter, r *http.Request) {
+	sessionData, ok := r.Context().Value("session-data").(SessionData)
+	if !ok {
+		w.WriteHeader(http.StatusInternalServerError)
+		app.logger.Error(fmt.Sprintf("could not cast session data from context to type SessionData"))
+		return
+	}
+
+	layer, err := strconv.Atoi(r.FormValue("layer"))
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		app.logger.Error(err.Error())
+		return
+	}
+
+	keyboard, err := app.qmkHelper.GetKeyboard(sessionData.Layout, sessionData.Keymap, layer)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		app.logger.Error(err.Error())
+		return
+	}
+
+	err = app.templates.ExecuteTemplate(w, "comp_keyboard_visualizer.html", keyboard)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		app.logger.Error(err.Error())
+		return
+	}
 }
 
 func (app *application) handleKeymapUpload(w http.ResponseWriter, r *http.Request) {
@@ -355,6 +386,7 @@ func (app *application) routes() http.Handler {
 	handler.Handle("POST /keymapselect", app.getSession(app.handleKeymapSelect))
 	handler.Handle("POST /keymap/upload", app.getSession(app.handleKeymapUpload))
 	handler.Handle("POST /layout/upload", app.getSession(app.handleLayoutUpload))
+	handler.Handle("POST /layerselect", app.getSession(app.handleLayerSelect))
 
 	return app.metrics(app.enableCORS(app.rateLimit(handler)))
 }

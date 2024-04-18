@@ -1,7 +1,6 @@
 <div class="visualizer" id="visualizer">
 	{{ if . }}
-	<form id="layerselect-form" hx-post="/layerselect"
-		hx-include="#keyboardselect-form, #layoutselect-form, #keymapselect-form" hx-target="#visualizer"
+	<form id="layerselect-form" hx-post="/layerselect" hx-include="#sessionform" hx-target="#visualizer"
 		hx-swap="outerHTML" hx-trigger="change">
 		Layer {{.CurrentLayer}}
 		{{ range .Layers }}
