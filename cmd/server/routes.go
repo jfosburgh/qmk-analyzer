@@ -145,6 +145,20 @@ func (app *application) handleKeymapUpload(w http.ResponseWriter, r *http.Reques
 		}
 		return
 	}
+
+	keyboard, err := app.qmkHelper.GetKeyboard(sessionData.Layout, sessionData.Keymap, 0)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		app.logger.Error(err.Error())
+		return
+	}
+
+	err = app.templates.ExecuteTemplate(w, "comp_keyboard_visualizer.html", keyboard)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		app.logger.Error(err.Error())
+		return
+	}
 }
 
 func (app *application) handleLayoutUpload(w http.ResponseWriter, r *http.Request) {
