@@ -4,12 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/hjson/hjson-go/v4"
 	"io"
-	"io/fs"
 	"os"
 	"path"
-	"strings"
 )
 
 type KeymapData struct {
@@ -45,91 +42,6 @@ func (km *KeymapData) ParseLayers() ([][]KC, error) {
 	return layers, nil
 }
 
-func LoadKeycodesFromJSONs(jsonPaths []string) (map[string]Keycode, error) {
-	keycodes := make(map[string]Keycode)
-	type KeycodeData struct {
-		Keycodes map[string]interface{} `json:"keycodes"`
-	}
-
-	for _, jsonPath := range jsonPaths {
-		f, err := os.Open(jsonPath)
-		defer f.Close()
-
-		if err != nil {
-			return nil, err
-		}
-
-		b, err := io.ReadAll(f)
-		if err != nil {
-			return nil, err
-		}
-
-		keycodeData := KeycodeData{}
-
-		err = hjson.Unmarshal(b, &keycodeData)
-		if err != nil {
-			fmt.Printf("error unmarshalling %s\n", jsonPath)
-			return nil, err
-		}
-
-		for _, temp := range keycodeData.Keycodes {
-			keycode := Keycode{}
-			data, ok := temp.(map[string]interface{})
-			if !ok {
-				continue
-			}
-
-			group, ok := data["group"].(string)
-			if ok {
-				keycode.Group = group
-			}
-
-			aliases, ok := data["aliases"].([]interface{})
-			if ok {
-				aliasArray := []string{}
-				for _, temp2 := range aliases {
-					aliasArray = append(aliasArray, temp2.(string))
-				}
-				keycode.Aliases = aliasArray
-			}
-
-			key, ok := data["key"].(string)
-			if ok {
-				keycode.Key = key
-			}
-
-			label, ok := data["label"].(string)
-			if ok {
-				keycode.Label = label
-			}
-
-			keycodes[keycode.Key] = keycode
-			for _, alias := range keycode.Aliases {
-				keycodes[alias] = keycode
-			}
-		}
-	}
-
-	return keycodes, nil
-}
-
-func FindKeycodeJSONs(keycodePath string) ([]string, error) {
-	jsons := []string{}
-
-	files, err := fs.Glob(os.DirFS(keycodePath), "*.hjson")
-	if err != nil {
-		return jsons, err
-	}
-
-	for _, file := range files {
-		if len(strings.Split(file, "_")) == 3 {
-			jsons = append(jsons, path.Join(keycodePath, file))
-		}
-	}
-
-	return jsons, nil
-}
-
 func LoadKeymapFromJSON(jsonPath string, keymapData *KeymapData) error {
 	f, err := os.Open(jsonPath)
 	defer f.Close()
@@ -149,26 +61,6 @@ func LoadKeymapFromJSON(jsonPath string, keymapData *KeymapData) error {
 	}
 
 	return nil
-}
-
-func FindKeymapJSON(rootPath, keyboard string) (string, error) {
-	keymap := ""
-	paths := strings.Split(keyboard, string(os.PathSeparator))
-
-	for _, pathPart := range paths {
-		rootPath = path.Join(rootPath, pathPart)
-		jsonPath := path.Join(rootPath, "/keymaps/default/keymap.json")
-
-		if _, err := os.Stat(jsonPath); err == nil {
-			keymap = jsonPath
-		}
-	}
-
-	if keymap == "" {
-		return keymap, errors.New("no default keymap json found")
-	}
-
-	return keymap, nil
 }
 
 func FindCustomKeymaps(keymapPath string) ([]string, error) {
@@ -219,4 +111,80 @@ func (q *QMKHelper) SaveKeymap(layout, name string, data []byte) (string, error)
 	}
 
 	return filePath, nil
+}
+
+func (q *QMKHelper) GetKeymapData(keymap string) (KeymapData, error) {
+	q.KeymapLock.Lock()
+	defer q.KeymapLock.Unlock()
+
+	cachedKeymap := KeymapData{}
+
+	data, ok := q.KeymapCache.Get(keymap)
+	if !ok {
+		err := LoadKeymapFromJSON(keymap, &cachedKeymap)
+		if err != nil {
+			return cachedKeymap, err
+		}
+	} else {
+		cachedKeymap, ok = data.(KeymapData)
+		if !ok {
+			return cachedKeymap, fmt.Errorf("keymapCache entry for %s is not expected type of KeymapData: %+v", keymap, data)
+		}
+	}
+
+	q.KeymapCache.Set(keymap, cachedKeymap)
+
+	return cachedKeymap, nil
+}
+
+type KeymapOption struct {
+	Name   string
+	Layout string
+	ID     string
+}
+
+func (q *QMKHelper) GetCustomKeymapsForLayouts(layout string) ([]KeymapOption, error) {
+	keymapOptions := []KeymapOption{}
+	jsons, err := FindCustomKeymaps(path.Join(q.KeymapDir, layout))
+
+	if err != nil || len(jsons) == 0 {
+		return keymapOptions, err
+	}
+
+	for _, jsonPath := range jsons {
+		keymapData, err := q.GetKeymapData(jsonPath)
+		if err != nil {
+			return keymapOptions, err
+		}
+
+		keymapOptions = append(keymapOptions, KeymapOption{
+			Name:   keymapData.Keymap,
+			Layout: keymapData.Layout,
+			ID:     jsonPath,
+		})
+	}
+
+	return keymapOptions, nil
+}
+
+func (q *QMKHelper) GetAllCustomKeymaps() ([]KeymapOption, error) {
+	keymapOptions := []KeymapOption{}
+
+	files, err := os.ReadDir(q.KeymapDir)
+	if err != nil {
+		return keymapOptions, err
+	}
+
+	for _, f := range files {
+		if f.IsDir() {
+			newKeymapOptions, err := q.GetCustomKeymapsForLayouts(f.Name())
+			if err != nil {
+				return keymapOptions, err
+			}
+
+			keymapOptions = append(keymapOptions, newKeymapOptions...)
+		}
+	}
+
+	return keymapOptions, nil
 }

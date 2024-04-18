@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"expvar"
 	"fmt"
 	"net/http"
@@ -17,13 +18,34 @@ func (app *application) recoverPanic(next http.Handler) http.Handler {
 		defer func() {
 			if err := recover(); err != nil {
 				w.Header().Set("Connection", "close")
-				app.logger.Error(fmt.Errorf("%s", err).Error())
+				app.logger.Error(fmt.Sprintf("%+v", err))
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
 		}()
 
 		next.ServeHTTP(w, r)
+	})
+}
+
+func (app *application) getSession(next func(w http.ResponseWriter, r *http.Request)) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		sessionID := r.FormValue("session")
+
+		session, ok := app.sessionCache.Get(sessionID)
+		if !ok {
+			app.logger.Info(fmt.Sprintf("Didn't find session id %s in cache", sessionID))
+			http.Redirect(w, r, "/", http.StatusSeeOther)
+			return
+		}
+
+		ctx := context.WithValue(r.Context(), "session-data", session)
+		ctx = context.WithValue(ctx, "session-id", sessionID)
+
+		app.logger.Info("adding to request context", "session-id", sessionID)
+		app.logger.Info("adding to request context", "session-data", session)
+
+		next(w, r.WithContext(ctx))
 	})
 }
 

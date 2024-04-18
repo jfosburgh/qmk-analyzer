@@ -13,8 +13,11 @@
 </head>
 
 <body>
+	{{ template "comp_session.html" .SessionID }}
 	<div id="content">
-		{{ template "index.html" . }}
+		{{ template "comp_keymap_upload.html" . }}
+		<p>or choose a premade keymap</p>
+		{{ template "comp_select.html" .KeymapSelectOptions }}
 	</div>
 </body>
 

@@ -55,8 +55,8 @@ func (app *application) serve() error {
 			case <-app.qmkHelper.Ticker.C:
 				app.wg.Add(1)
 				app.logger.Debug("pruning caches")
-				app.qmkHelper.PruneKeyboardCache(time.Minute)
-				app.qmkHelper.PruneKeymapCache(time.Minute)
+				app.qmkHelper.KeymapCache.Prune(time.Minute)
+				app.sessionCache.Prune(time.Hour * 24)
 				app.wg.Done()
 			}
 		}

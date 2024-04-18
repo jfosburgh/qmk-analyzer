@@ -9,20 +9,19 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/qmk-analyzer/internal/cache"
 )
 
 type QMKHelper struct {
-	KeyboardDir   string
-	LayoutDir     string
-	KeymapDir     string
-	Keycodes      map[string]Keycode
-	KeyboardCache KeyboardCache
-	KeymapCache   KeymapCache
-	KeyboardLock  sync.Mutex
-	KeymapLock    sync.Mutex
-	Shutdown      chan bool
-	Ticker        *time.Ticker
-	KeySize       float64
+	LayoutDir    string
+	KeymapDir    string
+	KeymapCache  cache.Cache
+	KeyboardLock sync.Mutex
+	KeymapLock   sync.Mutex
+	Shutdown     chan bool
+	Ticker       *time.Ticker
+	KeySize      float64
 }
 
 type Keyboard struct {
@@ -53,20 +52,6 @@ type KeyCap struct {
 	ModifierSize float64
 }
 
-type KeyboardCache map[string]KeyboardCacheEntry
-
-type KeymapCache map[string]KeymapCacheEntry
-
-type KeyboardCacheEntry struct {
-	Keyboard   KeyboardData
-	LastViewed time.Time
-}
-
-type KeymapCacheEntry struct {
-	Keymap     KeymapData
-	LastViewed time.Time
-}
-
 func findKeyboardsRecursive(base, sourceDir string) ([]string, error) {
 	names := []string{}
 
@@ -95,13 +80,7 @@ func findKeyboardsRecursive(base, sourceDir string) ([]string, error) {
 	return names, nil
 }
 
-func NewQMKHelper(keyboardDir, layoutDir, keymapDir, keycodeDir string) (*QMKHelper, error) {
-	if _, err := os.Stat(keyboardDir); os.IsNotExist(err) {
-		return &QMKHelper{}, fmt.Errorf("folder does not exist")
-	} else if err != nil {
-		return &QMKHelper{}, err
-	}
-
+func NewQMKHelper(layoutDir, keymapDir string) (*QMKHelper, error) {
 	if _, err := os.Stat(layoutDir); os.IsNotExist(err) {
 		return &QMKHelper{}, fmt.Errorf("folder does not exist")
 	} else if err != nil {
@@ -114,16 +93,6 @@ func NewQMKHelper(keyboardDir, layoutDir, keymapDir, keycodeDir string) (*QMKHel
 		return &QMKHelper{}, err
 	}
 
-	if _, err := os.Stat(keycodeDir); os.IsNotExist(err) {
-		return &QMKHelper{}, fmt.Errorf("folder does not exist")
-	} else if err != nil {
-		return &QMKHelper{}, err
-	}
-
-	if !strings.HasSuffix(keyboardDir, "/") {
-		keyboardDir += "/"
-	}
-
 	if !strings.HasSuffix(layoutDir, "/") {
 		layoutDir += "/"
 	}
@@ -132,162 +101,21 @@ func NewQMKHelper(keyboardDir, layoutDir, keymapDir, keycodeDir string) (*QMKHel
 		keymapDir += "/"
 	}
 
-	if !strings.HasSuffix(keycodeDir, "/") {
-		keycodeDir += "/"
-	}
-
 	ticker := time.NewTicker(time.Minute * 5)
 	done := make(chan bool)
 
-	keycodeJSONs, err := FindKeycodeJSONs(keycodeDir)
-	if err != nil {
-		fmt.Println("error finding keycodes")
-		return &QMKHelper{}, err
-	}
-
-	keycodes, err := LoadKeycodesFromJSONs(keycodeJSONs)
-	if err != nil {
-		fmt.Println("error parsing keycodes")
-		return &QMKHelper{}, err
-	}
-
 	q := &QMKHelper{
-		KeyboardDir:   strings.TrimPrefix(keyboardDir, "./"),
-		LayoutDir:     strings.TrimPrefix(layoutDir, "./"),
-		KeymapDir:     strings.TrimPrefix(keymapDir, "./"),
-		Keycodes:      keycodes,
-		KeyboardCache: make(KeyboardCache),
-		KeymapCache:   make(KeymapCache),
-		KeyboardLock:  sync.Mutex{},
-		KeymapLock:    sync.Mutex{},
-		Shutdown:      done,
-		Ticker:        ticker,
-		KeySize:       64,
+		LayoutDir:    strings.TrimPrefix(layoutDir, "./"),
+		KeymapDir:    strings.TrimPrefix(keymapDir, "./"),
+		KeymapCache:  cache.NewMemoryCache(),
+		KeyboardLock: sync.Mutex{},
+		KeymapLock:   sync.Mutex{},
+		Shutdown:     done,
+		Ticker:       ticker,
+		KeySize:      64,
 	}
 
 	return q, nil
-}
-
-func (q *QMKHelper) PruneKeyboardCache(lifetime time.Duration) {
-	q.KeyboardLock.Lock()
-	defer q.KeyboardLock.Unlock()
-
-	for key := range q.KeyboardCache {
-		if time.Since(q.KeyboardCache[key].LastViewed) < lifetime {
-			delete(q.KeyboardCache, key)
-		}
-	}
-}
-
-func (q *QMKHelper) PruneKeymapCache(lifetime time.Duration) {
-	q.KeymapLock.Lock()
-	defer q.KeymapLock.Unlock()
-
-	for key := range q.KeymapCache {
-		if time.Since(q.KeymapCache[key].LastViewed) < lifetime {
-			delete(q.KeymapCache, key)
-		}
-	}
-}
-
-func (q *QMKHelper) GetAllKeyboardNames() ([]string, error) {
-	names, err := findKeyboardsRecursive(q.KeyboardDir, q.KeyboardDir)
-	if err != nil {
-		return []string{}, err
-	}
-
-	return names, nil
-}
-
-func (q *QMKHelper) GetKeyboardData(keyboard string) (KeyboardData, error) {
-	q.KeyboardLock.Lock()
-	defer q.KeyboardLock.Unlock()
-
-	cachedKeyboard, ok := q.KeyboardCache[keyboard]
-	if !ok {
-		keyboardData := KeyboardData{}
-		jsons, err := FindInfoJSONs(q.KeyboardDir, keyboard)
-		if err != nil {
-			return keyboardData, err
-		}
-
-		keymapJSON, err := FindKeymapJSON(q.KeyboardDir, keyboard)
-
-		err = LoadFromJSONs(jsons, keymapJSON, &keyboardData)
-		if err != nil {
-			return keyboardData, err
-		}
-
-		cachedKeyboard = KeyboardCacheEntry{
-			Keyboard:   keyboardData,
-			LastViewed: time.Now(),
-		}
-	}
-
-	cachedKeyboard.LastViewed = time.Now()
-	q.KeyboardCache[keyboard] = cachedKeyboard
-
-	return cachedKeyboard.Keyboard, nil
-}
-
-func (q *QMKHelper) GetKeymapData(keymap string) (KeymapData, error) {
-	q.KeymapLock.Lock()
-	defer q.KeymapLock.Unlock()
-
-	cachedKeymap, ok := q.KeymapCache[keymap]
-	if !ok {
-		newKeymap := KeymapData{}
-		err := LoadKeymapFromJSON(keymap, &newKeymap)
-		if err != nil {
-			return newKeymap, err
-		}
-
-		cachedKeymap = KeymapCacheEntry{
-			Keymap: newKeymap,
-		}
-	}
-
-	cachedKeymap.LastViewed = time.Now()
-	q.KeymapCache[keymap] = cachedKeymap
-
-	return cachedKeymap.Keymap, nil
-}
-
-func (q *QMKHelper) GetLayoutsForKeyboard(keyboard string) ([]string, error) {
-	keyboardData, err := q.GetKeyboardData(keyboard)
-	if err != nil {
-		return []string{}, err
-	}
-
-	return keyboardData.GetLayouts(), nil
-}
-
-type KeymapOption struct {
-	Name string
-	ID   string
-}
-
-func (q *QMKHelper) GetCustomKeymapsForLayouts(layout string) ([]KeymapOption, error) {
-	keymapOptions := []KeymapOption{}
-	jsons, err := FindCustomKeymaps(path.Join(q.KeymapDir, layout))
-
-	if err != nil || len(jsons) == 0 {
-		return keymapOptions, err
-	}
-
-	for _, jsonPath := range jsons {
-		keymapData, err := q.GetKeymapData(jsonPath)
-		if err != nil {
-			return keymapOptions, err
-		}
-
-		keymapOptions = append(keymapOptions, KeymapOption{
-			Name: keymapData.Keymap,
-			ID:   jsonPath,
-		})
-	}
-
-	return keymapOptions, nil
 }
 
 func (q *QMKHelper) ApplyKeymap(keyboard *Keyboard, keymap KeymapData, layer int) error {
@@ -309,7 +137,7 @@ func (q *QMKHelper) ApplyKeymap(keyboard *Keyboard, keymap KeymapData, layer int
 		return errors.New(fmt.Sprintf("number of keys in layout %d does not match number of keys in keymap %d for %s", layer, keyboard.LayerCount, keyboard.Name))
 	}
 
-	for i := range len(keyboard.Keys) {
+	for i := range keyboard.Keys {
 		keyboard.Keys[i].Keycap.Raw = keymap.Layers[layer][i]
 		queue := CreateQueue(keyboard.Keys[i].Keycap.Raw)
 		keycode, err := queue.Parse()
@@ -331,74 +159,4 @@ func (q *QMKHelper) ApplyKeymap(keyboard *Keyboard, keymap KeymapData, layer int
 	}
 
 	return nil
-}
-
-func (q *QMKHelper) GetKeyboard(keyboardName, layoutName string, layer int, keymap string) (Keyboard, error) {
-	keys := []Key{}
-
-	keyboard := Keyboard{
-		Name:         keyboardName,
-		Layout:       layoutName,
-		CurrentLayer: layer,
-	}
-
-	keyboardData, err := q.GetKeyboardData(keyboardName)
-	if err != nil {
-		return keyboard, err
-	}
-
-	maxTop := 0.0
-	maxLeft := 0.0
-
-	layout, ok := keyboardData.Layouts[layoutName]
-	if !ok {
-		return keyboard, errors.New(fmt.Sprintf("Could not find layout %s in layout map for keyboard %s", layoutName, keyboardName))
-	} else {
-		for _, keyData := range layout.Layout {
-			newKey := Key{
-				X: keyData.X*q.KeySize + 5.0,
-				Y: keyData.Y*q.KeySize + 5.0,
-				W: max(q.KeySize, keyData.W*q.KeySize),
-				H: max(q.KeySize, keyData.H*q.KeySize),
-				Keycap: KeyCap{
-					MainSize:     q.KeySize / 3,
-					ModifierSize: q.KeySize / 5,
-				},
-			}
-
-			keys = append(keys, newKey)
-			left := keyData.X*q.KeySize + newKey.W
-			if left >= maxLeft {
-				maxLeft = left
-			}
-
-			top := keyData.Y*q.KeySize + newKey.H
-			if top >= maxTop {
-				maxTop = top
-			}
-		}
-	}
-
-	keyboard.Keys = keys
-	keyboard.Height = maxTop + 10.0
-	keyboard.Width = maxLeft + 10.0
-
-	if keymap == "default" {
-		err = q.ApplyKeymap(&keyboard, keyboardData.DefaultKeymap, layer)
-		if err != nil {
-			return keyboard, err
-		}
-	} else {
-		keymapData, err := q.GetKeymapData(keymap)
-		if err != nil {
-			return keyboard, err
-		}
-
-		err = q.ApplyKeymap(&keyboard, keymapData, layer)
-		if err != nil {
-			return keyboard, err
-		}
-	}
-
-	return keyboard, nil
 }

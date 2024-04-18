@@ -3,11 +3,12 @@
 	<label for="{{.Name}}">{{.Label}}</label>
 	<select name="{{.Name}}">
 		{{ range .Options }}
-		{{ if eq $.Selected .Name }}
+		{{ if eq $.Selected .ID }}
 		<option selected="selected" value="{{.ID}}">{{.Name}}</option>
 		{{ else }}
 		<option value="{{.ID}}">{{.Name}}</option>
 		{{ end }}
 		{{ end }}
 	</select>
+	<button type="submit">Submit</button>
 </form>

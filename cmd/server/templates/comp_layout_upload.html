@@ -1,7 +1,8 @@
-<form id="keymapupload-form" hx-encoding="multipart/form-data" hx-post="/keymap/upload"
+<p>A layout file for {{.}} could not be found on the server, please upload it.</p>
+<form id="keymapupload-form" hx-encoding="multipart/form-data" hx-post="/layout/upload"
 	_='on htmx:xhr:progress(loaded, total) set #progress.value to (loaded/total)*100' hx-target="#content"
 	hx-swap="outerHTML" hx-include="#sessionform">
-	<input type="file" name="keymap-file" />
+	<input type="file" name="layout-file" />
 	<button>Upload</button>
 	<progress id='progress' value='0' max="100"></progress>
 </form>
