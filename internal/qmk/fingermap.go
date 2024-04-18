@@ -1,11 +1,11 @@
 package qmk
 
-type fingermap struct {
+type Fingermap struct {
 	Keys []int `json:"mappings"`
 }
 
-func blankFingerMap(keys int) fingermap {
-	return fingermap{
+func BlankFingerMap(keys int) Fingermap {
+	return Fingermap{
 		Keys: make([]int, keys),
 	}
 }

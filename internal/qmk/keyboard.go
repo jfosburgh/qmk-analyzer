@@ -1,6 +1,9 @@
 package qmk
 
-import "math/rand"
+import (
+	"fmt"
+	"math/rand"
+)
 
 type Keyboard struct {
 	Layout       string
@@ -19,6 +22,7 @@ type Key struct {
 	H      float64
 	Keycap KeyCap
 	Finger int
+	Index  int
 }
 
 type KeyCap struct {
@@ -28,6 +32,18 @@ type KeyCap struct {
 	Hold         string
 	MainSize     float64
 	ModifierSize float64
+}
+
+func (k *Keyboard) ApplyFingermap(fingermap Fingermap) error {
+	if len(k.Keys) != len(fingermap.Keys) {
+		return fmt.Errorf("number keys in keyboard %d != number keys in fingermap %s", len(k.Keys), len(fingermap.Keys))
+	}
+
+	for i := range len(k.Keys) {
+		k.Keys[i].Finger = fingermap.Keys[i]
+	}
+
+	return nil
 }
 
 func (q *QMKHelper) GetKeyboard(layoutName, keymap string, layer int) (Keyboard, error) {
@@ -45,7 +61,7 @@ func (q *QMKHelper) GetKeyboard(layoutName, keymap string, layer int) (Keyboard,
 		return keyboard, err
 	}
 
-	for _, keyPosition := range layout {
+	for i, keyPosition := range layout {
 		newKey := Key{
 			X: keyPosition.X*q.KeySize + 5.0,
 			Y: keyPosition.Y*q.KeySize + 5.0,
@@ -56,6 +72,7 @@ func (q *QMKHelper) GetKeyboard(layoutName, keymap string, layer int) (Keyboard,
 				ModifierSize: q.KeySize / 5,
 			},
 			Finger: rand.Intn(10) + 1,
+			Index:  i,
 		}
 
 		keyboard.Keys = append(keyboard.Keys, newKey)
