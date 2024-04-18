@@ -10,5 +10,7 @@
 		{{ end }}
 		{{ end }}
 	</select>
+	{{if eq .Trigger "submit"}}
 	<button type="submit">Submit</button>
+	{{end}}
 </form>

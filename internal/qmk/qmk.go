@@ -14,15 +14,16 @@ import (
 )
 
 type QMKHelper struct {
-	LayoutDir   string
-	KeymapDir   string
-	KeymapCache cache.Cache
-	KeymapLock  sync.Mutex
-	LayoutCache cache.Cache
-	LayoutLock  sync.Mutex
-	Shutdown    chan bool
-	Ticker      *time.Ticker
-	KeySize     float64
+	LayoutDir    string
+	KeymapDir    string
+	FingermapDir string
+	KeymapCache  cache.Cache
+	KeymapLock   sync.Mutex
+	LayoutCache  cache.Cache
+	LayoutLock   sync.Mutex
+	Shutdown     chan bool
+	Ticker       *time.Ticker
+	KeySize      float64
 }
 
 func findKeyboardsRecursive(base, sourceDir string) ([]string, error) {
@@ -53,7 +54,7 @@ func findKeyboardsRecursive(base, sourceDir string) ([]string, error) {
 	return names, nil
 }
 
-func NewQMKHelper(layoutDir, keymapDir string) (*QMKHelper, error) {
+func NewQMKHelper(layoutDir, keymapDir, fingermapDir string) (*QMKHelper, error) {
 	if _, err := os.Stat(layoutDir); os.IsNotExist(err) {
 		return &QMKHelper{}, fmt.Errorf("folder does not exist")
 	} else if err != nil {
@@ -61,6 +62,12 @@ func NewQMKHelper(layoutDir, keymapDir string) (*QMKHelper, error) {
 	}
 
 	if _, err := os.Stat(keymapDir); os.IsNotExist(err) {
+		return &QMKHelper{}, fmt.Errorf("folder does not exist")
+	} else if err != nil {
+		return &QMKHelper{}, err
+	}
+
+	if _, err := os.Stat(fingermapDir); os.IsNotExist(err) {
 		return &QMKHelper{}, fmt.Errorf("folder does not exist")
 	} else if err != nil {
 		return &QMKHelper{}, err
@@ -74,19 +81,24 @@ func NewQMKHelper(layoutDir, keymapDir string) (*QMKHelper, error) {
 		keymapDir += "/"
 	}
 
+	if !strings.HasSuffix(fingermapDir, "/") {
+		fingermapDir += "/"
+	}
+
 	ticker := time.NewTicker(time.Minute * 5)
 	done := make(chan bool)
 
 	q := &QMKHelper{
-		LayoutDir:   strings.TrimPrefix(layoutDir, "./"),
-		KeymapDir:   strings.TrimPrefix(keymapDir, "./"),
-		KeymapCache: cache.NewMemoryCache(),
-		LayoutCache: cache.NewMemoryCache(),
-		LayoutLock:  sync.Mutex{},
-		KeymapLock:  sync.Mutex{},
-		Shutdown:    done,
-		Ticker:      ticker,
-		KeySize:     64,
+		LayoutDir:    strings.TrimPrefix(layoutDir, "./"),
+		KeymapDir:    strings.TrimPrefix(keymapDir, "./"),
+		FingermapDir: strings.TrimPrefix(fingermapDir, "./"),
+		KeymapCache:  cache.NewMemoryCache(),
+		LayoutCache:  cache.NewMemoryCache(),
+		LayoutLock:   sync.Mutex{},
+		KeymapLock:   sync.Mutex{},
+		Shutdown:     done,
+		Ticker:       ticker,
+		KeySize:      64,
 	}
 
 	return q, nil

@@ -1,12 +1,4 @@
-<div class="visualizer" id="visualizer">
-	<div class="keyboard-container" style="width: {{.Width}}px; height: {{.Height}}px;">
-		<form hx-post="/fingermap" hx-include="#sessionform" hx-target="#content" hx-swap="innerHTML">
-			{{ range .Keys }}
-			<div class="key-container" style="top: {{.Y}}px; left: {{.X}}px; width: {{.W}}px; height: {{.H}}px;">
-				{{template "comp_finger_input.html" .}}
-			</div>
-			{{ end }}
-			<button type="submit">Submit</button>
-		</form>
-	</div>
-</div>
+<p>Create a fingermap</p>
+{{template "comp_fingermap_visualizer.html" .Keyboard}}
+<p>or choose an existing fingermap</p>
+{{template "comp_select.html" .FingermapOptions}}
