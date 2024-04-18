@@ -1,4 +1,4 @@
-<form id="{{.Name}}-form" hx-post="/{{.Name}}" hx-target="#{{.SwapTarget}}" hx-swap="outerHTML"
+<form id="{{.Name}}-form" hx-post="/{{.Name}}" hx-target="#{{.SwapTarget}}" hx-swap="innerHTML"
 	hx-trigger="{{.Trigger}}" {{if .Include}}hx-include="{{.Include}}" {{end}}>
 	<label for="{{.Name}}">{{.Label}}</label>
 	<select name="{{.Name}}">

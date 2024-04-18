@@ -14,42 +14,15 @@ import (
 )
 
 type QMKHelper struct {
-	LayoutDir    string
-	KeymapDir    string
-	KeymapCache  cache.Cache
-	KeyboardLock sync.Mutex
-	KeymapLock   sync.Mutex
-	Shutdown     chan bool
-	Ticker       *time.Ticker
-	KeySize      float64
-}
-
-type Keyboard struct {
-	Name         string
-	Layout       string
-	Keys         []Key
-	LayerCount   int
-	Layers       []int
-	CurrentLayer int
-	Width        float64
-	Height       float64
-}
-
-type Key struct {
-	X      float64
-	Y      float64
-	W      float64
-	H      float64
-	Keycap KeyCap
-}
-
-type KeyCap struct {
-	Raw          string
-	Main         string
-	Shift        string
-	Hold         string
-	MainSize     float64
-	ModifierSize float64
+	LayoutDir   string
+	KeymapDir   string
+	KeymapCache cache.Cache
+	KeymapLock  sync.Mutex
+	LayoutCache cache.Cache
+	LayoutLock  sync.Mutex
+	Shutdown    chan bool
+	Ticker      *time.Ticker
+	KeySize     float64
 }
 
 func findKeyboardsRecursive(base, sourceDir string) ([]string, error) {
@@ -105,14 +78,15 @@ func NewQMKHelper(layoutDir, keymapDir string) (*QMKHelper, error) {
 	done := make(chan bool)
 
 	q := &QMKHelper{
-		LayoutDir:    strings.TrimPrefix(layoutDir, "./"),
-		KeymapDir:    strings.TrimPrefix(keymapDir, "./"),
-		KeymapCache:  cache.NewMemoryCache(),
-		KeyboardLock: sync.Mutex{},
-		KeymapLock:   sync.Mutex{},
-		Shutdown:     done,
-		Ticker:       ticker,
-		KeySize:      64,
+		LayoutDir:   strings.TrimPrefix(layoutDir, "./"),
+		KeymapDir:   strings.TrimPrefix(keymapDir, "./"),
+		KeymapCache: cache.NewMemoryCache(),
+		LayoutCache: cache.NewMemoryCache(),
+		LayoutLock:  sync.Mutex{},
+		KeymapLock:  sync.Mutex{},
+		Shutdown:    done,
+		Ticker:      ticker,
+		KeySize:     64,
 	}
 
 	return q, nil
@@ -126,7 +100,7 @@ func (q *QMKHelper) ApplyKeymap(keyboard *Keyboard, keymap KeymapData, layer int
 	}
 
 	if keyboard.LayerCount > 0 && layer >= keyboard.LayerCount {
-		return errors.New(fmt.Sprintf("layer %d does not exist for %s with %d layers", layer, keyboard.Name, keyboard.LayerCount))
+		return errors.New(fmt.Sprintf("layer %d does not exist for %s with %d layers", layer, keymap.Keymap, keyboard.LayerCount))
 	}
 
 	for i := 0; i < keyboard.LayerCount; i++ {
@@ -134,7 +108,7 @@ func (q *QMKHelper) ApplyKeymap(keyboard *Keyboard, keymap KeymapData, layer int
 	}
 
 	if keyboard.LayerCount > 0 && len(keyboard.Keys) != len(keymap.Layers[0]) {
-		return errors.New(fmt.Sprintf("number of keys in layout %d does not match number of keys in keymap %d for %s", layer, keyboard.LayerCount, keyboard.Name))
+		return errors.New(fmt.Sprintf("number of keys in layout %d does not match number of keys in keymap %d for %s", layer, keyboard.LayerCount, keymap.Keymap))
 	}
 
 	for i := range keyboard.Keys {

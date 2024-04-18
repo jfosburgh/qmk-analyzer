@@ -1,89 +1,80 @@
 package qmk
 
-import (
-	"encoding/json"
-	"io"
-	"os"
-	"path"
-	"strings"
-)
+import ()
 
-type KeyboardData struct {
-	KeyboardName     string   `json:"keyboard_name"`
-	Manufacturer     string   `json:"manufacturer"`
-	CommunityLayouts []string `json:"community_layouts"`
-	LayoutAliases    struct {
-		Layout string `json:"LAYOUT"`
-	} `json:"layout_aliases"`
-	Layouts       map[string]LayoutData `json:"layouts"`
-	DefaultKeymap KeymapData
+type Keyboard struct {
+	Layout       string
+	Keys         []Key
+	LayerCount   int
+	Layers       []int
+	CurrentLayer int
+	Width        float64
+	Height       float64
 }
 
-type LayoutData struct {
-	Layout []KeyData `json:"layout"`
+type Key struct {
+	X      float64
+	Y      float64
+	W      float64
+	H      float64
+	Keycap KeyCap
 }
 
-type KeyData struct {
-	X      float64 `json:"x"`
-	Y      float64 `json:"y"`
-	W      float64 `json:"w"`
-	H      float64 `json:"h"`
-	Matrix []int   `json:"matrix"`
+type KeyCap struct {
+	Raw          string
+	Main         string
+	Shift        string
+	Hold         string
+	MainSize     float64
+	ModifierSize float64
 }
 
-func (k *KeyboardData) GetLayouts() []string {
-	layouts := []string{}
-
-	for layout := range k.Layouts {
-		layouts = append(layouts, layout)
+func (q *QMKHelper) GetKeyboard(layoutName, keymap string, layer int) (Keyboard, error) {
+	keyboard := Keyboard{
+		Layout:       layoutName,
+		CurrentLayer: layer,
+		Keys:         []Key{},
 	}
 
-	return layouts
-}
+	maxTop := 0.0
+	maxLeft := 0.0
 
-func LoadFromJSONs(infoJSONPaths []string, keymapJSON string, keyboardData *KeyboardData) error {
-	for _, jsonPath := range infoJSONPaths {
-		f, err := os.Open(jsonPath)
-		defer f.Close()
-
-		if err != nil {
-			return err
-		}
-
-		b, err := io.ReadAll(f)
-		if err != nil {
-			return err
-		}
-
-		err = json.Unmarshal(b, keyboardData)
-		if err != nil {
-			return err
-		}
+	layout, err := q.GetLayoutData(layoutName)
+	if err != nil {
+		return keyboard, err
 	}
 
-	if keymapJSON != "" {
-		keyboardData.DefaultKeymap = KeymapData{}
-		err := LoadKeymapFromJSON(keymapJSON, &keyboardData.DefaultKeymap)
-		if err != nil {
-			return err
+	for _, keyPosition := range layout {
+		newKey := Key{
+			X: keyPosition.X*q.KeySize + 5.0,
+			Y: keyPosition.Y*q.KeySize + 5.0,
+			W: max(q.KeySize, keyPosition.W*q.KeySize),
+			H: max(q.KeySize, keyPosition.H*q.KeySize),
+			Keycap: KeyCap{
+				MainSize:     q.KeySize / 3,
+				ModifierSize: q.KeySize / 5,
+			},
 		}
+
+		keyboard.Keys = append(keyboard.Keys, newKey)
+
+		left := keyPosition.X*q.KeySize + newKey.W
+		maxLeft = max(left, maxLeft)
+
+		top := keyPosition.Y*q.KeySize + newKey.H
+		maxTop = max(top, maxTop)
 	}
 
-	return nil
-}
+	keyboard.Height = maxTop + 10.0
+	keyboard.Width = maxLeft + 10.0
 
-func FindInfoJSONs(rootPath, keyboard string) ([]string, error) {
-	jsons := []string{}
-	paths := strings.Split(keyboard, string(os.PathSeparator))
-
-	for _, pathPart := range paths {
-		rootPath = path.Join(rootPath, pathPart)
-		jsonPath := path.Join(rootPath, "info.json")
-
-		if _, err := os.Stat(jsonPath); err == nil {
-			jsons = append(jsons, jsonPath)
+	keymapData, err := q.GetKeymapData(keymap)
+	if err == nil {
+		err = q.ApplyKeymap(&keyboard, keymapData, layer)
+		if err != nil {
+			return keyboard, err
 		}
 	}
 
-	return jsons, nil
+	return keyboard, nil
 }

@@ -148,12 +148,12 @@ func (app *application) handleKeymapUpload(w http.ResponseWriter, r *http.Reques
 }
 
 func (app *application) handleLayoutUpload(w http.ResponseWriter, r *http.Request) {
-	sessionID, ok := r.Context().Value("session-id").(string)
-	if !ok {
-		w.WriteHeader(http.StatusInternalServerError)
-		app.logger.Error(fmt.Sprintf("could not cast session data from context to type string"))
-		return
-	}
+	// sessionID, ok := r.Context().Value("session-id").(string)
+	// if !ok {
+	// 	w.WriteHeader(http.StatusInternalServerError)
+	// 	app.logger.Error(fmt.Sprintf("could not cast session data from context to type string"))
+	// 	return
+	// }
 
 	sessionData, ok := r.Context().Value("session-data").(SessionData)
 	if !ok {
@@ -165,6 +165,46 @@ func (app *application) handleLayoutUpload(w http.ResponseWriter, r *http.Reques
 	bytes, err := extractFileUpload(r, "layout-file", "application/json", 1<<20)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
+		app.logger.Error(err.Error())
+		return
+	}
+
+	layoutData := qmk.LayoutData{}
+	err = json.Unmarshal(bytes, &layoutData)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		app.logger.Error(err.Error())
+		return
+	}
+
+	layoutSlice, ok := layoutData.Layout[sessionData.Layout]
+	if !ok {
+		w.WriteHeader(http.StatusBadRequest)
+		app.logger.Error(fmt.Sprintf("layout %s could not be found in uploaded data: %+v", sessionData.Layout, layoutData))
+		return
+	}
+
+	layout := layoutSlice["layout"]
+
+	_, err = app.qmkHelper.SaveLayout(sessionData.Layout, bytes)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		app.logger.Error(err.Error())
+		return
+	}
+
+	app.qmkHelper.LayoutCache.Set(sessionData.Layout, layout)
+
+	keyboard, err := app.qmkHelper.GetKeyboard(sessionData.Layout, sessionData.Keymap, 0)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		app.logger.Error(err.Error())
+		return
+	}
+
+	err = app.templates.ExecuteTemplate(w, "comp_keyboard_visualizer.html", keyboard)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
 		app.logger.Error(err.Error())
 		return
 	}
@@ -204,10 +244,34 @@ func (app *application) handleKeymapSelect(w http.ResponseWriter, r *http.Reques
 		app.logger.Error(err.Error())
 	}
 
-	err = app.templates.ExecuteTemplate(w, "comp_layout_upload.html", keymapData.Layout)
+	layouts, err := app.qmkHelper.GetAllLayouts()
 	if err != nil {
-		w.WriteHeader(500)
+		w.WriteHeader(http.StatusInternalServerError)
 		app.logger.Error(err.Error())
+		return
+	}
+
+	if !slices.Contains(layouts, keymapData.Layout) {
+		err = app.templates.ExecuteTemplate(w, "comp_layout_upload.html", keymapData.Layout)
+		if err != nil {
+			w.WriteHeader(500)
+			app.logger.Error(err.Error())
+		}
+		return
+	}
+
+	keyboard, err := app.qmkHelper.GetKeyboard(sessionData.Layout, sessionData.Keymap, 0)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		app.logger.Error(err.Error())
+		return
+	}
+
+	err = app.templates.ExecuteTemplate(w, "comp_keyboard_visualizer.html", keyboard)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		app.logger.Error(err.Error())
+		return
 	}
 }
 
