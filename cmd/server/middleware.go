@@ -28,7 +28,7 @@ func (app *application) recoverPanic(next http.Handler) http.Handler {
 	})
 }
 
-func (app *application) getSession(next func(w http.ResponseWriter, r *http.Request)) http.Handler {
+func (app *application) getSession(next func(w http.ResponseWriter, r *http.Request, s SessionData)) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		sessionID := r.FormValue("session")
 
@@ -39,8 +39,15 @@ func (app *application) getSession(next func(w http.ResponseWriter, r *http.Requ
 			return
 		}
 
+		sessionData, ok := session.(SessionData)
+		if !ok {
+			app.logger.Info("Couldn't cast cached data to session")
+			http.Redirect(w, r, "/", http.StatusSeeOther)
+			return
+		}
+
 		ctx := context.WithValue(r.Context(), "session-data", session)
-		next(w, r.WithContext(ctx))
+		next(w, r.WithContext(ctx), sessionData)
 	})
 }
 

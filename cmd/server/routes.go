@@ -1,17 +1,14 @@
 package main
 
 import (
-	"crypto/rand"
 	"embed"
 	"encoding/json"
 	"expvar"
 	"fmt"
 	"html/template"
-	"io"
 	"net/http"
 	"path"
 	"path/filepath"
-	"slices"
 	"strconv"
 
 	"github.com/qmk-analyzer/internal/qmk"
@@ -44,41 +41,7 @@ type SessionData struct {
 	ID        string
 }
 
-func extractFileUpload(r *http.Request, formFileName, expectedType string, sizeLimit int64) ([]byte, error) {
-	r.ParseMultipartForm(sizeLimit)
-
-	f, handler, err := r.FormFile(formFileName)
-	defer f.Close()
-
-	if err != nil {
-		return []byte{}, err
-	}
-
-	if handler.Size > sizeLimit {
-		return []byte{}, err
-	}
-
-	contentType := handler.Header.Get("Content-Type")
-	if contentType != expectedType {
-		return []byte{}, err
-	}
-
-	bytes, err := io.ReadAll(f)
-	if err != nil {
-		return []byte{}, err
-	}
-
-	return bytes, nil
-}
-
-func (app *application) handleFingermapSelection(w http.ResponseWriter, r *http.Request) {
-	sessionData, ok := r.Context().Value("session-data").(SessionData)
-	if !ok {
-		w.WriteHeader(http.StatusInternalServerError)
-		app.logger.Error(fmt.Sprintf("could not cast session data from context to type SessionData"))
-		return
-	}
-
+func (app *application) handleFingermapSelectionChanged(w http.ResponseWriter, r *http.Request, sessionData SessionData) {
 	fingermapName := r.FormValue("fingermapselect")
 	if fingermapName == "" {
 		w.WriteHeader(http.StatusBadRequest)
@@ -96,33 +59,28 @@ func (app *application) handleFingermapSelection(w http.ResponseWriter, r *http.
 	sessionData.FingerMap = &fingermap
 	app.sessionCache.Set(sessionData.ID, sessionData)
 
-	keyboard, err := app.qmkHelper.GetKeyboard(sessionData.Layout, sessionData.Keymap, 0)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		app.logger.Error(err.Error())
-		return
-	}
-
-	err = keyboard.ApplyFingermap(fingermap)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		app.logger.Error(err.Error())
-		return
-	}
-
-	err = app.templates.ExecuteTemplate(w, "comp_fingermap_visualizer.html", keyboard)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		app.logger.Error(err.Error())
-		return
-	}
+	app.respondWithFingermapVisualizer(w, sessionData, 0)
 }
 
-func getRandomFilename(extension string) (string, error) {
-	name := make([]byte, 16)
-	_, err := rand.Read(name)
+func (app *application) handleFingermapSelected(w http.ResponseWriter, r *http.Request, sessionData SessionData) {
+	fingermapName := r.FormValue("fingermapselect")
+	if fingermapName == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
 
-	return fmt.Sprintf("%x%s", name, extension), err
+	fingermapPath := path.Join(app.qmkHelper.FingermapDir, sessionData.Keymap.Layout, fingermapName)
+	fingermap, err := app.qmkHelper.LoadFingermapFromJSON(fingermapPath)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		app.logger.Error(err.Error())
+		return
+	}
+
+	sessionData.FingerMap = &fingermap
+	app.sessionCache.Set(sessionData.ID, sessionData)
+
+	app.respondWithKeyboardVisualizer(w, sessionData, 0)
 }
 
 func (app *application) handleFingerChange(w http.ResponseWriter, r *http.Request) {
@@ -158,14 +116,7 @@ func (app *application) handleFingerChange(w http.ResponseWriter, r *http.Reques
 	}
 }
 
-func (app *application) handlePostFingermap(w http.ResponseWriter, r *http.Request) {
-	sessionData, ok := r.Context().Value("session-data").(SessionData)
-	if !ok {
-		w.WriteHeader(http.StatusInternalServerError)
-		app.logger.Error(fmt.Sprintf("could not cast session data from context to type SessionData"))
-		return
-	}
-
+func (app *application) handlePostFingermap(w http.ResponseWriter, r *http.Request, sessionData SessionData) {
 	numKeys := len(*sessionData.Layout)
 	fingermap := qmk.BlankFingerMap(numKeys)
 	for i := range numKeys {
@@ -179,115 +130,25 @@ func (app *application) handlePostFingermap(w http.ResponseWriter, r *http.Reque
 		fingermap.Keys[i] = finger
 	}
 
-	keyboard, err := app.qmkHelper.GetKeyboard(sessionData.Layout, sessionData.Keymap, 0)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		app.logger.Error(err.Error())
-		return
-	}
-
-	keyboard.ApplyFingermap(fingermap)
-	sessionData.FingerMap = &fingermap
-	app.sessionCache.Set(sessionData.ID, sessionData)
-
 	name, err := getRandomFilename(".json")
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		app.logger.Error(err.Error())
 		return
 	}
+
 	app.qmkHelper.SaveFingermap(sessionData.Keymap.Layout, name, fingermap)
+	sessionData.FingerMap = &fingermap
+	app.sessionCache.Set(sessionData.ID, sessionData)
 
-	err = app.templates.ExecuteTemplate(w, "comp_keyboard_visualizer.html", keyboard)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		app.logger.Error(err.Error())
-		return
-	}
+	app.respondWithKeyboardVisualizer(w, sessionData, 0)
 }
 
-func (app *application) handleGetFingermap(w http.ResponseWriter, r *http.Request) {
-	sessionData, ok := r.Context().Value("session-data").(SessionData)
-	if !ok {
-		w.WriteHeader(http.StatusInternalServerError)
-		app.logger.Error(fmt.Sprintf("could not cast session data from context to type SessionData"))
-		return
-	}
-
-	keyboard, err := app.qmkHelper.GetKeyboard(sessionData.Layout, sessionData.Keymap, 0)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		app.logger.Error(err.Error())
-		return
-	}
-
-	type Data struct {
-		Keyboard         qmk.Keyboard
-		FingermapOptions selectOptions
-	}
-
-	fingermaps, err := app.qmkHelper.GetFingermapsForLayout(sessionData.Keymap.Layout)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		app.logger.Error(err.Error())
-		return
-	}
-
-	fingermapOptions := selectOptions{
-		Name:       "fingermapselect",
-		Label:      "fingermap",
-		Trigger:    "change",
-		Include:    "#sessionform",
-		SwapTarget: "visualizer",
-	}
-
-	if len(fingermaps) > 0 {
-		fingermapOptions.Selected = fingermaps[0]
-		fingermapPath := path.Join(app.qmkHelper.FingermapDir, sessionData.Keymap.Layout, fingermaps[0])
-
-		fingermap, err := app.qmkHelper.LoadFingermapFromJSON(fingermapPath)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			app.logger.Error(err.Error())
-			return
-		}
-
-		err = keyboard.ApplyFingermap(fingermap)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			app.logger.Error(err.Error())
-			return
-		}
-	}
-
-	for i, fingermap := range fingermaps {
-		fingermapOptions.Options = append(fingermapOptions.Options, SelectOption{
-			ID:   fingermap,
-			Name: fmt.Sprint(i),
-		})
-	}
-
-	data := Data{
-		Keyboard:         keyboard,
-		FingermapOptions: fingermapOptions,
-	}
-
-	err = app.templates.ExecuteTemplate(w, "comp_fingermap.html", data)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		app.logger.Error(err.Error())
-		return
-	}
+func (app *application) handleGetFingermap(w http.ResponseWriter, r *http.Request, sessionData SessionData) {
+	app.respondWithFingermapCreator(w, sessionData)
 }
 
-func (app *application) handleLayerSelect(w http.ResponseWriter, r *http.Request) {
-	sessionData, ok := r.Context().Value("session-data").(SessionData)
-	if !ok {
-		w.WriteHeader(http.StatusInternalServerError)
-		app.logger.Error(fmt.Sprintf("could not cast session data from context to type SessionData"))
-		return
-	}
-
+func (app *application) handleLayerSelect(w http.ResponseWriter, r *http.Request, sessionData SessionData) {
 	layer, err := strconv.Atoi(r.FormValue("layer"))
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
@@ -295,38 +156,10 @@ func (app *application) handleLayerSelect(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	keyboard, err := app.qmkHelper.GetKeyboard(sessionData.Layout, sessionData.Keymap, layer)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		app.logger.Error(err.Error())
-		return
-	}
-
-	if sessionData.FingerMap != nil {
-		err := keyboard.ApplyFingermap(*sessionData.FingerMap)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			app.logger.Error(err.Error())
-			return
-		}
-	}
-
-	err = app.templates.ExecuteTemplate(w, "comp_keyboard_visualizer.html", keyboard)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		app.logger.Error(err.Error())
-		return
-	}
+	app.respondWithKeyboardVisualizer(w, sessionData, layer)
 }
 
-func (app *application) handleKeymapUpload(w http.ResponseWriter, r *http.Request) {
-	sessionData, ok := r.Context().Value("session-data").(SessionData)
-	if !ok {
-		w.WriteHeader(http.StatusInternalServerError)
-		app.logger.Error(fmt.Sprintf("could not cast session data from context to type SessionData"))
-		return
-	}
-
+func (app *application) handleKeymapUpload(w http.ResponseWriter, r *http.Request, sessionData SessionData) {
 	bytes, err := extractFileUpload(r, "keymap-file", "application/json", 1<<20)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
@@ -359,111 +192,18 @@ func (app *application) handleKeymapUpload(w http.ResponseWriter, r *http.Reques
 	sessionData.Keymap = &keymapData
 	app.sessionCache.Set(sessionData.ID, sessionData)
 
-	layouts, err := app.qmkHelper.GetAllLayouts()
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		app.logger.Error(err.Error())
-		return
-	}
-
-	err = app.templates.ExecuteTemplate(w, "comp_session.html", sessionData.ID)
-	if err != nil {
-		w.WriteHeader(500)
-		app.logger.Error(err.Error())
-	}
-
-	if !slices.Contains(layouts, keymapData.Layout) {
-		err = app.templates.ExecuteTemplate(w, "comp_layout_upload.html", keymapData.Layout)
-		if err != nil {
-			w.WriteHeader(500)
-			app.logger.Error(err.Error())
-		}
-		return
-	}
-
-	layout, err := app.qmkHelper.GetLayoutData(keymapData.Layout)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		app.logger.Error(err.Error())
+	layout, ok := app.layoutExists(w, sessionData)
+	if !ok {
 		return
 	}
 
 	sessionData.Layout = &layout
 	app.sessionCache.Set(sessionData.ID, sessionData)
 
-	keyboard, err := app.qmkHelper.GetKeyboard(sessionData.Layout, sessionData.Keymap, 0)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		app.logger.Error(err.Error())
-		return
-	}
-
-	type Data struct {
-		Keyboard         qmk.Keyboard
-		FingermapOptions selectOptions
-	}
-
-	fingermaps, err := app.qmkHelper.GetFingermapsForLayout(sessionData.Keymap.Layout)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		app.logger.Error(err.Error())
-		return
-	}
-
-	fingermapOptions := selectOptions{
-		Name:       "fingermapselect",
-		Label:      "fingermap",
-		Trigger:    "change",
-		Include:    "#sessionform",
-		SwapTarget: "visualizer",
-	}
-
-	if len(fingermaps) > 0 {
-		fingermapOptions.Selected = fingermaps[0]
-		fingermapPath := path.Join(app.qmkHelper.FingermapDir, sessionData.Keymap.Layout, fingermaps[0])
-
-		fingermap, err := app.qmkHelper.LoadFingermapFromJSON(fingermapPath)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			app.logger.Error(err.Error())
-			return
-		}
-
-		err = keyboard.ApplyFingermap(fingermap)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			app.logger.Error(err.Error())
-			return
-		}
-	}
-
-	for i, fingermap := range fingermaps {
-		fingermapOptions.Options = append(fingermapOptions.Options, SelectOption{
-			ID:   fingermap,
-			Name: fmt.Sprint(i),
-		})
-	}
-
-	data := Data{
-		Keyboard:         keyboard,
-		FingermapOptions: fingermapOptions,
-	}
-	err = app.templates.ExecuteTemplate(w, "comp_fingermap.html", data)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		app.logger.Error(err.Error())
-		return
-	}
+	app.respondWithFingermapCreator(w, sessionData)
 }
 
-func (app *application) handleLayoutUpload(w http.ResponseWriter, r *http.Request) {
-	sessionData, ok := r.Context().Value("session-data").(SessionData)
-	if !ok {
-		w.WriteHeader(http.StatusInternalServerError)
-		app.logger.Error(fmt.Sprintf("could not cast session data from context to type SessionData"))
-		return
-	}
-
+func (app *application) handleLayoutUpload(w http.ResponseWriter, r *http.Request, sessionData SessionData) {
 	bytes, err := extractFileUpload(r, "layout-file", "application/json", 1<<20)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
@@ -499,80 +239,10 @@ func (app *application) handleLayoutUpload(w http.ResponseWriter, r *http.Reques
 	sessionData.Layout = &layout
 	app.sessionCache.Set(sessionData.ID, sessionData)
 
-	keyboard, err := app.qmkHelper.GetKeyboard(sessionData.Layout, sessionData.Keymap, 0)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		app.logger.Error(err.Error())
-		return
-	}
-
-	type Data struct {
-		Keyboard         qmk.Keyboard
-		FingermapOptions selectOptions
-	}
-
-	fingermaps, err := app.qmkHelper.GetFingermapsForLayout(sessionData.Keymap.Layout)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		app.logger.Error(err.Error())
-		return
-	}
-
-	fingermapOptions := selectOptions{
-		Name:       "fingermapselect",
-		Label:      "fingermap",
-		Trigger:    "change",
-		Include:    "#sessionform",
-		SwapTarget: "visualizer",
-	}
-
-	if len(fingermaps) > 0 {
-		fingermapOptions.Selected = fingermaps[0]
-		fingermapPath := path.Join(app.qmkHelper.FingermapDir, sessionData.Keymap.Layout, fingermaps[0])
-
-		fingermap, err := app.qmkHelper.LoadFingermapFromJSON(fingermapPath)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			app.logger.Error(err.Error())
-			return
-		}
-
-		err = keyboard.ApplyFingermap(fingermap)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			app.logger.Error(err.Error())
-			return
-		}
-	}
-
-	for i, fingermap := range fingermaps {
-		fingermapOptions.Options = append(fingermapOptions.Options, SelectOption{
-			ID:   fingermap,
-			Name: fmt.Sprint(i),
-		})
-	}
-
-	data := Data{
-		Keyboard:         keyboard,
-		FingermapOptions: fingermapOptions,
-	}
-
-	err = app.templates.ExecuteTemplate(w, "comp_fingermap.html", data)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		app.logger.Error(err.Error())
-		return
-	}
+	app.respondWithFingermapCreator(w, sessionData)
 }
 
-func (app *application) handleKeymapSelect(w http.ResponseWriter, r *http.Request) {
-	sessionData, ok := r.Context().Value("session-data").(SessionData)
-	if !ok {
-		w.WriteHeader(http.StatusInternalServerError)
-		app.logger.Error(fmt.Sprintf("could not cast session data from context to type SessionData: %+v", sessionData))
-		return
-	}
-
+func (app *application) handleKeymapSelect(w http.ResponseWriter, r *http.Request, sessionData SessionData) {
 	keymapKey := r.FormValue("keymapselect")
 	if keymapKey == "" {
 		w.WriteHeader(http.StatusBadRequest)
@@ -587,103 +257,18 @@ func (app *application) handleKeymapSelect(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	layout, err := app.qmkHelper.GetLayoutData(keymapData.Layout)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		app.logger.Error(err.Error())
+	sessionData.Keymap = &keymapData
+	app.sessionCache.Set(sessionData.ID, sessionData)
+
+	layout, ok := app.layoutExists(w, sessionData)
+	if !ok {
 		return
 	}
 
-	sessionData.Keymap = &keymapData
 	sessionData.Layout = &layout
 	app.sessionCache.Set(sessionData.ID, sessionData)
 
-	err = app.templates.ExecuteTemplate(w, "comp_session.html", sessionData.ID)
-	if err != nil {
-		w.WriteHeader(500)
-		app.logger.Error(err.Error())
-	}
-
-	layouts, err := app.qmkHelper.GetAllLayouts()
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		app.logger.Error(err.Error())
-		return
-	}
-
-	if !slices.Contains(layouts, keymapData.Layout) {
-		err = app.templates.ExecuteTemplate(w, "comp_layout_upload.html", keymapData.Layout)
-		if err != nil {
-			w.WriteHeader(500)
-			app.logger.Error(err.Error())
-		}
-		return
-	}
-
-	keyboard, err := app.qmkHelper.GetKeyboard(sessionData.Layout, sessionData.Keymap, 0)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		app.logger.Error(err.Error())
-		return
-	}
-
-	type Data struct {
-		Keyboard         qmk.Keyboard
-		FingermapOptions selectOptions
-	}
-
-	fingermaps, err := app.qmkHelper.GetFingermapsForLayout(sessionData.Keymap.Layout)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		app.logger.Error(err.Error())
-		return
-	}
-
-	fingermapOptions := selectOptions{
-		Name:       "fingermapselect",
-		Label:      "fingermap",
-		Trigger:    "change",
-		Include:    "#sessionform",
-		SwapTarget: "visualizer",
-	}
-
-	if len(fingermaps) > 0 {
-		fingermapOptions.Selected = fingermaps[0]
-		fingermapPath := path.Join(app.qmkHelper.FingermapDir, sessionData.Keymap.Layout, fingermaps[0])
-
-		fingermap, err := app.qmkHelper.LoadFingermapFromJSON(fingermapPath)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			app.logger.Error(err.Error())
-			return
-		}
-
-		err = keyboard.ApplyFingermap(fingermap)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			app.logger.Error(err.Error())
-			return
-		}
-	}
-
-	for i, fingermap := range fingermaps {
-		fingermapOptions.Options = append(fingermapOptions.Options, SelectOption{
-			ID:   fingermap,
-			Name: fmt.Sprint(i),
-		})
-	}
-
-	data := Data{
-		Keyboard:         keyboard,
-		FingermapOptions: fingermapOptions,
-	}
-
-	err = app.templates.ExecuteTemplate(w, "comp_fingermap.html", data)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		app.logger.Error(err.Error())
-		return
-	}
+	app.respondWithFingermapCreator(w, sessionData)
 }
 
 func (app *application) handleIndex(w http.ResponseWriter, r *http.Request) {
@@ -723,8 +308,8 @@ func (app *application) handleIndex(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(500)
 		app.logger.Error(err.Error())
 	}
-	sessionData := SessionData{ID: sessionId}
 
+	sessionData := SessionData{ID: sessionId}
 	app.sessionCache.Set(sessionId, sessionData)
 
 	data := Data{
@@ -755,7 +340,8 @@ func (app *application) routes() http.Handler {
 	handler.Handle("POST /layerselect", app.getSession(app.handleLayerSelect))
 	handler.Handle("GET /fingermap", app.getSession(app.handleGetFingermap))
 	handler.Handle("POST /fingermap", app.getSession(app.handlePostFingermap))
-	handler.Handle("POST /fingermapselect", app.getSession(app.handleFingermapSelection))
+	handler.Handle("POST /fingermapselect", app.getSession(app.handleFingermapSelectionChanged))
+	handler.Handle("POST /fingermapselected", app.getSession(app.handleFingermapSelected))
 	handler.HandleFunc("POST /fingerchange/{index}", app.handleFingerChange)
 
 	return app.metrics(app.enableCORS(app.rateLimit(handler)))
