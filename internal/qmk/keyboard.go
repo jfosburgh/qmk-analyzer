@@ -1,6 +1,6 @@
 package qmk
 
-import ()
+import "math/rand"
 
 type Keyboard struct {
 	Layout       string
@@ -18,6 +18,7 @@ type Key struct {
 	W      float64
 	H      float64
 	Keycap KeyCap
+	Finger int
 }
 
 type KeyCap struct {
@@ -54,6 +55,7 @@ func (q *QMKHelper) GetKeyboard(layoutName, keymap string, layer int) (Keyboard,
 				MainSize:     q.KeySize / 3,
 				ModifierSize: q.KeySize / 5,
 			},
+			Finger: rand.Intn(10) + 1,
 		}
 
 		keyboard.Keys = append(keyboard.Keys, newKey)

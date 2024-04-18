@@ -1,0 +1,4 @@
+<div class="key finger{{.}}">
+	<input hx-post="/fingerchange" hx-target="closest div" hx-swap="outerHTML" class="fingerinput" type="text"
+		name="finger" value="{{.}}" hx-trigger="change">
+</div>

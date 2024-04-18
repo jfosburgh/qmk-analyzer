@@ -76,6 +76,45 @@ func getRandomFilename(extension string) (string, error) {
 	return fmt.Sprintf("%x%s", name, extension), err
 }
 
+func (app *application) handleFingerChange(w http.ResponseWriter, r *http.Request) {
+	finger, err := strconv.Atoi(r.FormValue("finger"))
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		app.logger.Error(err.Error())
+		return
+	}
+
+	err = app.templates.ExecuteTemplate(w, "comp_finger_input.html", finger)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		app.logger.Error(err.Error())
+		return
+	}
+}
+
+func (app *application) handleFingermap(w http.ResponseWriter, r *http.Request) {
+	sessionData, ok := r.Context().Value("session-data").(SessionData)
+	if !ok {
+		w.WriteHeader(http.StatusInternalServerError)
+		app.logger.Error(fmt.Sprintf("could not cast session data from context to type SessionData"))
+		return
+	}
+
+	keyboard, err := app.qmkHelper.GetKeyboard(sessionData.Layout, sessionData.Keymap, 0)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		app.logger.Error(err.Error())
+		return
+	}
+
+	err = app.templates.ExecuteTemplate(w, "comp_fingermap.html", keyboard)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		app.logger.Error(err.Error())
+		return
+	}
+}
+
 func (app *application) handleLayerSelect(w http.ResponseWriter, r *http.Request) {
 	sessionData, ok := r.Context().Value("session-data").(SessionData)
 	if !ok {
@@ -184,7 +223,7 @@ func (app *application) handleKeymapUpload(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	err = app.templates.ExecuteTemplate(w, "comp_keyboard_visualizer.html", keyboard)
+	err = app.templates.ExecuteTemplate(w, "comp_fingermap.html", keyboard)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		app.logger.Error(err.Error())
@@ -247,7 +286,7 @@ func (app *application) handleLayoutUpload(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	err = app.templates.ExecuteTemplate(w, "comp_keyboard_visualizer.html", keyboard)
+	err = app.templates.ExecuteTemplate(w, "comp_fingermap.html", keyboard)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		app.logger.Error(err.Error())
@@ -312,7 +351,7 @@ func (app *application) handleKeymapSelect(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	err = app.templates.ExecuteTemplate(w, "comp_keyboard_visualizer.html", keyboard)
+	err = app.templates.ExecuteTemplate(w, "comp_fingermap.html", keyboard)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		app.logger.Error(err.Error())
@@ -387,6 +426,8 @@ func (app *application) routes() http.Handler {
 	handler.Handle("POST /keymap/upload", app.getSession(app.handleKeymapUpload))
 	handler.Handle("POST /layout/upload", app.getSession(app.handleLayoutUpload))
 	handler.Handle("POST /layerselect", app.getSession(app.handleLayerSelect))
+	handler.Handle("POST /fingermap", app.getSession(app.handleFingermap))
+	handler.HandleFunc("POST /fingerchange", app.handleFingerChange)
 
 	return app.metrics(app.enableCORS(app.rateLimit(handler)))
 }
