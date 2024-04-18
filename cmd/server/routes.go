@@ -37,9 +37,10 @@ type selectOptions struct {
 }
 
 type SessionData struct {
-	Layout    string
-	Keymap    string
-	FingerMap string
+	Layout    *qmk.Layout
+	Keymap    *qmk.KeymapData
+	FingerMap *qmk.Fingermap
+	ID        string
 }
 
 func extractFileUpload(r *http.Request, formFileName, expectedType string, sizeLimit int64) ([]byte, error) {
@@ -117,15 +118,9 @@ func (app *application) handlePostFingermap(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	layout, err := app.qmkHelper.GetLayoutData(sessionData.Layout)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		app.logger.Error(err.Error())
-		return
-	}
-
-	fingermap := qmk.BlankFingerMap(len(layout))
-	for i := range len(layout) {
+	numKeys := len(*sessionData.Layout)
+	fingermap := qmk.BlankFingerMap(numKeys)
+	for i := range numKeys {
 		finger, err := strconv.Atoi(r.FormValue(fmt.Sprintf("finger%d", i)))
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
@@ -144,6 +139,8 @@ func (app *application) handlePostFingermap(w http.ResponseWriter, r *http.Reque
 	}
 
 	keyboard.ApplyFingermap(fingermap)
+	sessionData.FingerMap = &fingermap
+	app.sessionCache.Set(sessionData.ID, sessionData)
 
 	err = app.templates.ExecuteTemplate(w, "comp_keyboard_visualizer.html", keyboard)
 	if err != nil {
@@ -198,6 +195,15 @@ func (app *application) handleLayerSelect(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	if sessionData.FingerMap != nil {
+		err := keyboard.ApplyFingermap(*sessionData.FingerMap)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			app.logger.Error(err.Error())
+			return
+		}
+	}
+
 	err = app.templates.ExecuteTemplate(w, "comp_keyboard_visualizer.html", keyboard)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -207,13 +213,6 @@ func (app *application) handleLayerSelect(w http.ResponseWriter, r *http.Request
 }
 
 func (app *application) handleKeymapUpload(w http.ResponseWriter, r *http.Request) {
-	sessionID, ok := r.Context().Value("session-id").(string)
-	if !ok {
-		w.WriteHeader(http.StatusInternalServerError)
-		app.logger.Error(fmt.Sprintf("could not cast session data from context to type string"))
-		return
-	}
-
 	sessionData, ok := r.Context().Value("session-data").(SessionData)
 	if !ok {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -249,11 +248,7 @@ func (app *application) handleKeymapUpload(w http.ResponseWriter, r *http.Reques
 		keymapKey, err = app.qmkHelper.SaveKeymap(keymapData.Layout, name, bytes)
 	}
 
-	sessionData.Keymap = keymapKey
-	sessionData.Layout = keymapData.Layout
-
 	app.qmkHelper.KeymapCache.Set(keymapKey, keymapData)
-	app.sessionCache.Set(sessionID, sessionData)
 
 	layouts, err := app.qmkHelper.GetAllLayouts()
 	if err != nil {
@@ -262,7 +257,7 @@ func (app *application) handleKeymapUpload(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	err = app.templates.ExecuteTemplate(w, "comp_session.html", sessionID)
+	err = app.templates.ExecuteTemplate(w, "comp_session.html", sessionData.ID)
 	if err != nil {
 		w.WriteHeader(500)
 		app.logger.Error(err.Error())
@@ -276,6 +271,17 @@ func (app *application) handleKeymapUpload(w http.ResponseWriter, r *http.Reques
 		}
 		return
 	}
+
+	layout, err := app.qmkHelper.GetLayoutData(keymapData.Layout)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		app.logger.Error(err.Error())
+		return
+	}
+
+	sessionData.Layout = &layout
+	sessionData.Keymap = &keymapData
+	app.sessionCache.Set(sessionData.ID, sessionData)
 
 	keyboard, err := app.qmkHelper.GetKeyboard(sessionData.Layout, sessionData.Keymap, 0)
 	if err != nil {
@@ -293,13 +299,6 @@ func (app *application) handleKeymapUpload(w http.ResponseWriter, r *http.Reques
 }
 
 func (app *application) handleLayoutUpload(w http.ResponseWriter, r *http.Request) {
-	// sessionID, ok := r.Context().Value("session-id").(string)
-	// if !ok {
-	// 	w.WriteHeader(http.StatusInternalServerError)
-	// 	app.logger.Error(fmt.Sprintf("could not cast session data from context to type string"))
-	// 	return
-	// }
-
 	sessionData, ok := r.Context().Value("session-data").(SessionData)
 	if !ok {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -322,23 +321,23 @@ func (app *application) handleLayoutUpload(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	layoutSlice, ok := layoutData.Layout[sessionData.Layout]
+	layoutSlice, ok := layoutData.Layout[sessionData.Keymap.Layout]
 	if !ok {
 		w.WriteHeader(http.StatusBadRequest)
-		app.logger.Error(fmt.Sprintf("layout %s could not be found in uploaded data: %+v", sessionData.Layout, layoutData))
+		app.logger.Error(fmt.Sprintf("layout %s could not be found in uploaded data: %+v", sessionData.Keymap.Layout, layoutData))
 		return
 	}
 
 	layout := layoutSlice["layout"]
 
-	_, err = app.qmkHelper.SaveLayout(sessionData.Layout, bytes)
+	_, err = app.qmkHelper.SaveLayout(sessionData.Keymap.Layout, bytes)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		app.logger.Error(err.Error())
 		return
 	}
 
-	app.qmkHelper.LayoutCache.Set(sessionData.Layout, layout)
+	app.qmkHelper.LayoutCache.Set(sessionData.Keymap.Layout, layout)
 
 	keyboard, err := app.qmkHelper.GetKeyboard(sessionData.Layout, sessionData.Keymap, 0)
 	if err != nil {
@@ -356,10 +355,10 @@ func (app *application) handleLayoutUpload(w http.ResponseWriter, r *http.Reques
 }
 
 func (app *application) handleKeymapSelect(w http.ResponseWriter, r *http.Request) {
-	sessionID, ok := r.Context().Value("session-id").(string)
+	sessionData, ok := r.Context().Value("session-data").(SessionData)
 	if !ok {
 		w.WriteHeader(http.StatusInternalServerError)
-		app.logger.Error(fmt.Sprintf("could not cast session id from context to type string: %+v", sessionID))
+		app.logger.Error(fmt.Sprintf("could not cast session data from context to type SessionData: %+v", sessionData))
 		return
 	}
 
@@ -377,13 +376,18 @@ func (app *application) handleKeymapSelect(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	sessionData := SessionData{
-		Keymap: keymapKey,
-		Layout: keymapData.Layout,
+	layout, err := app.qmkHelper.GetLayoutData(keymapData.Layout)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		app.logger.Error(err.Error())
+		return
 	}
-	app.sessionCache.Set(sessionID, sessionData)
 
-	err = app.templates.ExecuteTemplate(w, "comp_session.html", sessionID)
+	sessionData.Keymap = &keymapData
+	sessionData.Layout = &layout
+	app.sessionCache.Set(sessionData.ID, sessionData)
+
+	err = app.templates.ExecuteTemplate(w, "comp_session.html", sessionData.ID)
 	if err != nil {
 		w.WriteHeader(500)
 		app.logger.Error(err.Error())
@@ -452,12 +456,12 @@ func (app *application) handleIndex(w http.ResponseWriter, r *http.Request) {
 		keymapSelectOptions.Selected = keymapSelectOptions.Options[0].ID
 	}
 
-	sessionData := SessionData{}
 	sessionId, err := getRandomFilename("")
 	if err != nil {
 		w.WriteHeader(500)
 		app.logger.Error(err.Error())
 	}
+	sessionData := SessionData{ID: sessionId}
 
 	app.sessionCache.Set(sessionId, sessionData)
 

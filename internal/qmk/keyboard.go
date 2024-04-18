@@ -2,7 +2,6 @@ package qmk
 
 import (
 	"fmt"
-	"math/rand"
 )
 
 type Keyboard struct {
@@ -46,9 +45,9 @@ func (k *Keyboard) ApplyFingermap(fingermap Fingermap) error {
 	return nil
 }
 
-func (q *QMKHelper) GetKeyboard(layoutName, keymap string, layer int) (Keyboard, error) {
+func (q *QMKHelper) GetKeyboard(layout *Layout, keymap *KeymapData, layer int) (Keyboard, error) {
 	keyboard := Keyboard{
-		Layout:       layoutName,
+		Layout:       keymap.Layout,
 		CurrentLayer: layer,
 		Keys:         []Key{},
 	}
@@ -56,12 +55,7 @@ func (q *QMKHelper) GetKeyboard(layoutName, keymap string, layer int) (Keyboard,
 	maxTop := 0.0
 	maxLeft := 0.0
 
-	layout, err := q.GetLayoutData(layoutName)
-	if err != nil {
-		return keyboard, err
-	}
-
-	for i, keyPosition := range layout {
+	for i, keyPosition := range *layout {
 		newKey := Key{
 			X: keyPosition.X*q.KeySize + 5.0,
 			Y: keyPosition.Y*q.KeySize + 5.0,
@@ -71,8 +65,7 @@ func (q *QMKHelper) GetKeyboard(layoutName, keymap string, layer int) (Keyboard,
 				MainSize:     q.KeySize / 3,
 				ModifierSize: q.KeySize / 5,
 			},
-			Finger: rand.Intn(10) + 1,
-			Index:  i,
+			Index: i,
 		}
 
 		keyboard.Keys = append(keyboard.Keys, newKey)
@@ -87,9 +80,8 @@ func (q *QMKHelper) GetKeyboard(layoutName, keymap string, layer int) (Keyboard,
 	keyboard.Height = maxTop + 10.0
 	keyboard.Width = maxLeft + 10.0
 
-	keymapData, err := q.GetKeymapData(keymap)
-	if err == nil {
-		err = q.ApplyKeymap(&keyboard, keymapData, layer)
+	if keymap != nil {
+		err := q.ApplyKeymap(&keyboard, keymap, layer)
 		if err != nil {
 			return keyboard, err
 		}

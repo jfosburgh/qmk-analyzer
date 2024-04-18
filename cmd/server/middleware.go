@@ -40,11 +40,6 @@ func (app *application) getSession(next func(w http.ResponseWriter, r *http.Requ
 		}
 
 		ctx := context.WithValue(r.Context(), "session-data", session)
-		ctx = context.WithValue(ctx, "session-id", sessionID)
-
-		app.logger.Info("adding to request context", "session-id", sessionID)
-		app.logger.Info("adding to request context", "session-data", session)
-
 		next(w, r.WithContext(ctx))
 	})
 }

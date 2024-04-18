@@ -92,7 +92,7 @@ func NewQMKHelper(layoutDir, keymapDir string) (*QMKHelper, error) {
 	return q, nil
 }
 
-func (q *QMKHelper) ApplyKeymap(keyboard *Keyboard, keymap KeymapData, layer int) error {
+func (q *QMKHelper) ApplyKeymap(keyboard *Keyboard, keymap *KeymapData, layer int) error {
 	if keymap.Layers != nil {
 		keyboard.LayerCount = len(keymap.Layers)
 	} else {
