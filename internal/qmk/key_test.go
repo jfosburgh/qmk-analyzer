@@ -71,18 +71,3 @@ func TestParseKeycapBasicOther(t *testing.T) {
 	NoError(t, err)
 	Equal(t, KC{Default: ";", Shift: ":"}, res)
 }
-
-// func TestParseQuantum(t *testing.T) {
-// 	keycode := "QK_MAKE"
-// 	queue := CreateQueue(keycode)
-// 	_, err := queue.Parse()
-//
-// 	NoError(t, err)
-// }
-
-// func TestParseKeymap(t *testing.T) {
-// 	data := KeymapData{}
-// 	err := LoadKeymapFromJSON("./test_content/keymaps/ferris-sweep-reimagined.json", &data)
-//
-// 	NoError(t, err)
-// }
