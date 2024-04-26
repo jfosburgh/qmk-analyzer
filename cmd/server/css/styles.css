@@ -42,7 +42,6 @@ header>h1 {
 	flex-direction: column;
 	align-items: center;
 	justify-content: center;
-	background-color: gray;
 	border-radius: 6px;
 	height: calc(100% - 4px);
 	width: calc(100% - 4px);
@@ -54,5 +53,54 @@ header>h1 {
 
 .key>p {
 	margin: -3px;
+	text-align: center;
+}
+
+.finger0 {
+	background-color: gray;
+}
+
+.finger1 {
+	background-color: #948ae2;
+}
+
+.finger2 {
+	background-color: #9c64de;
+}
+
+.finger3 {
+	background-color: #b269bc;
+}
+
+.finger4 {
+	background-color: #c96998;
+}
+
+.finger5 {
+	background-color: #df6470;
+}
+
+.finger6 {
+	background-color: #da8b6b;
+}
+
+.finger7 {
+	background-color: #ccb269;
+}
+
+.finger8 {
+	background-color: #b5d665;
+}
+
+.finger9 {
+	background-color: #87b1e0;
+}
+
+.finger10 {
+	background-color: #6fd6dc;
+}
+
+.fingerinput {
+	width: 16px;
 	text-align: center;
 }

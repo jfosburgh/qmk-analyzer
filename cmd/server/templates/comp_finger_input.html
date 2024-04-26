@@ -1,0 +1,4 @@
+<div id="key{{.Index}}" class=" key finger{{.Finger}}">
+	<input hx-post="/fingerchange/{{.Index}}" hx-target="#key{{.Index}}" hx-swap="outerHTML" class="fingerinput"
+		type="text" name="finger{{.Index}}" value="{{.Finger}}" hx-trigger="change">
+</div>

@@ -1,7 +1,6 @@
 <div class="visualizer" id="visualizer">
 	{{ if . }}
-	<form id="layerselect-form" hx-post="/layerselect"
-		hx-include="#keyboardselect-form, #layoutselect-form, #keymapselect-form" hx-target="#visualizer"
+	<form id="layerselect-form" hx-post="/layerselect" hx-include="#sessionform" hx-target="#visualizer"
 		hx-swap="outerHTML" hx-trigger="change">
 		Layer {{.CurrentLayer}}
 		{{ range .Layers }}
@@ -11,7 +10,7 @@
 	<div class="keyboard-container" style="width: {{.Width}}px; height: {{.Height}}px;">
 		{{ range .Keys }}
 		<div class="key-container" style="top: {{.Y}}px; left: {{.X}}px; width: {{.W}}px; height: {{.H}}px;">
-			<div class="key">
+			<div class="key finger{{.Finger}}">
 				{{if .Keycap.Shift}}<p style="font-size: {{.Keycap.MainSize}}px;">{{.Keycap.Shift}}</p>{{end}}
 				<p style="font-size: {{.Keycap.MainSize}}px;">{{.Keycap.Main}}</p>
 			</div>

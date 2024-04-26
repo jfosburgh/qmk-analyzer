@@ -1,13 +1,16 @@
-<form id="{{.Name}}-form" hx-post="/{{.Name}}" hx-target="#{{.SwapTarget}}" hx-swap="outerHTML"
+<form id="{{.Name}}-form" hx-post="/{{.Name}}" hx-target="#{{.SwapTarget}}" hx-swap="innerHTML"
 	hx-trigger="{{.Trigger}}" {{if .Include}}hx-include="{{.Include}}" {{end}}>
 	<label for="{{.Name}}">{{.Label}}</label>
 	<select name="{{.Name}}">
 		{{ range .Options }}
-		{{ if eq $.Selected .Name }}
+		{{ if eq $.Selected .ID }}
 		<option selected="selected" value="{{.ID}}">{{.Name}}</option>
 		{{ else }}
 		<option value="{{.ID}}">{{.Name}}</option>
 		{{ end }}
 		{{ end }}
 	</select>
+	{{if eq .Trigger "submit"}}
+	<button type="submit">Submit</button>
+	{{end}}
 </form>
