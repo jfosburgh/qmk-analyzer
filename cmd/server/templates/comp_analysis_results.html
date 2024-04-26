@@ -1,11 +1,33 @@
 <div id="analysis">
 	{{ if . }}
 	<h3>Same Finger Bigrams</h3>
-	{{ if .SFBs }}
+	{{ if .SFBCounts }}
 	<h4>Total SFBs: {{.SFBTotal}}</h4>
-	{{ range $sfb, $count := .SFBs }}
-	<p>{{$sfb}}: {{$count}}</p>
-	{{end}}
+	<h4>By Bigram</h4>
+	<div style="display: flex; flex-wrap: wrap; justify-content: space-evenly; width: 40%;">
+		{{ range $item := .SFBCounts }}
+		<p style="padding: 5px;">{{$item.Label}}: {{$item.Value}}</p>
+		{{end}}
+	</div>
+	<h4>By Finger</h4>
+	<div style="display: flex; justify-content: space-evenly;">
+		<div style="display: flex; flex-direction: column;">
+			<h5>Left Hand</h5>
+			<p class="finger1">Pinky: {{index .SFBFingerCounts 0}}</p>
+			<p class="finger2">Ring Finger: {{index .SFBFingerCounts 1}}</p>
+			<p class="finger3">Middle Finger: {{index .SFBFingerCounts 2}}</p>
+			<p class="finger4">Pointer Finger: {{index .SFBFingerCounts 3}}</p>
+			<p class="finger5">Thumb: {{index .SFBFingerCounts 4}}</p>
+		</div>
+		<div style="display: flex; flex-direction: column;">
+			<h5>Right Hand</h5>
+			<p class="finger6">Pinky: {{index .SFBFingerCounts 5}}</p>
+			<p class="finger7">Ring Finger: {{index .SFBFingerCounts 6}}</p>
+			<p class="finger8">Middle Finger: {{index .SFBFingerCounts 7}}</p>
+			<p class="finger9">Pointer Finger: {{index .SFBFingerCounts 8}}</p>
+			<p class="finger10">Thumb: {{index .SFBFingerCounts 9}}</p>
+		</div>
+	</div>
 	{{ else }}
 	<p>Congrats, there were no bigrams found!</p>
 	{{ end }}

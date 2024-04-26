@@ -2,7 +2,7 @@ package qmk
 
 import (
 	"fmt"
-	"slices"
+	"sort"
 	"strings"
 )
 
@@ -18,25 +18,15 @@ type KeyPress struct {
 	Index  int
 }
 
-func MakeNGrams(symbols []string, gramLen int, includeRepeatedLetters bool) []string {
-	ngrams := make([]string, len(symbols))
-	copy(ngrams, symbols)
+type AnalysisData struct {
+	SFBCounts       []CountEntry
+	SFBFingerCounts [10]int
+	SFBTotal        int
+}
 
-	for range gramLen - 1 {
-		newNgrams := make([]string, 0)
-		for _, symbol := range symbols {
-			for _, ngram := range ngrams {
-				if !strings.Contains(ngram, symbol) || includeRepeatedLetters {
-					newNgrams = append(newNgrams, fmt.Sprintf("%s%s", ngram, symbol))
-				}
-			}
-		}
-
-		ngrams = make([]string, len(newNgrams))
-		copy(ngrams, newNgrams)
-	}
-
-	return ngrams
+type CountEntry struct {
+	Label string
+	Value int
 }
 
 func (k KeyFinder) FindSameFingerNGrams(ngrams []string) []string {
@@ -62,29 +52,85 @@ func (k KeyFinder) FindSameFingerNGrams(ngrams []string) []string {
 	return sfns
 }
 
-func (k KeyFinder) CountSameFingerNGrams(text string, length int, includeRepeatedLetters bool) map[string]int {
-	counts := make(map[string]int, 0)
+func (k KeyFinder) Analyze(text string, includeRepeatedLetters bool) (AnalysisData, error) {
+	sfbCounts := make(map[string]int)
+	sfbFingerCounts := [10]int{0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+	chars := strings.Split(text, "")
 
-	symbols := strings.Split("abcdefghijklmnopqrstuvwxyz", "")
-	ngrams := MakeNGrams(symbols, length, includeRepeatedLetters)
-
-	sfns := k.FindSameFingerNGrams(ngrams)
-
-	text = strings.ToLower(text)
-	runes := []rune(text)
-
-	for i := range len(runes) - length {
-		ngram := string(runes[i : i+length])
-		if slices.Contains(sfns, ngram) {
-			if _, ok := counts[ngram]; !ok {
-				counts[ngram] = 0
-			}
-
-			counts[ngram] += 1
+	prev := []KeyCombo{}
+	for i := range len(chars) {
+		current, ok := k[string(chars[i])]
+		if !ok {
+			fmt.Printf("%s not found in keyboard\n", string(chars[i]))
+			prev = []KeyCombo{}
+			continue
 		}
+
+		// if len(current) > 1 {
+		// 	// return AnalysisData{}, fmt.Errorf("found multiple possible keycombos for %s, not implemented yet: %+v", string(chars[i]), current)
+		// 	fmt.Printf("found multiple possible keycombos for %s, not implemented yet (defaulting to first entry): %+v\n", string(chars[i]), current)
+		// }
+
+		if len(current[0].Keys) > 1 {
+			return AnalysisData{}, fmt.Errorf("found multiple keypresses in combo for %s, not implemented yet: %+v", string(chars[i]), current[0])
+		}
+
+		if current[0].BaseLayer != 0 {
+			return AnalysisData{}, fmt.Errorf("base layer for keycombo of %s is not 0, not implemented yet: %+v", string(chars[i]), current[0])
+		}
+
+		if i == 0 {
+			prev = current
+			continue
+		}
+
+		if len(prev) == 0 {
+			prev = current
+			continue
+		}
+
+		if current[0].Keys[0].Finger == prev[0].Keys[0].Finger && (includeRepeatedLetters || chars[i] != chars[i-1]) {
+			bigram := fmt.Sprintf("%s%s", chars[i-1], chars[i])
+
+			_, ok := sfbCounts[bigram]
+			if !ok {
+				sfbCounts[bigram] = 0
+			}
+			sfbCounts[bigram] += 1
+
+			finger := current[0].Keys[0].Finger
+			sfbFingerCounts[finger-1] += 1
+		}
+
+		prev = current
 	}
 
-	return counts
+	keys := []string{}
+	for key := range sfbCounts {
+		keys = append(keys, key)
+	}
+	sort.SliceStable(keys, func(i, j int) bool {
+		return sfbCounts[keys[i]] < sfbCounts[keys[j]]
+	})
+
+	sortedSFBs := []CountEntry{}
+	for _, key := range keys {
+		sortedSFBs = append(sortedSFBs, CountEntry{
+			Label: key,
+			Value: sfbCounts[key],
+		})
+	}
+
+	sfbTotal := 0
+	for _, count := range sfbCounts {
+		sfbTotal += count
+	}
+
+	return AnalysisData{
+		SFBCounts:       sortedSFBs,
+		SFBFingerCounts: sfbFingerCounts,
+		SFBTotal:        sfbTotal,
+	}, nil
 }
 
 func CreateKeyfinder(layers [][]KC, fingermap Fingermap) (KeyFinder, error) {

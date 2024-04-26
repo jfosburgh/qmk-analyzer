@@ -310,19 +310,13 @@ func (app *application) handleAnalyze(w http.ResponseWriter, r *http.Request, se
 	text := r.FormValue("text")
 	repeats := r.FormValue("repeats") == "on"
 
-	sfbCounts := sessionData.KeyFinder.CountSameFingerNGrams(text, 2, repeats)
-
-	sfbTotal := 0
-	for _, count := range sfbCounts {
-		sfbTotal += count
+	data, err := sessionData.KeyFinder.Analyze(text, repeats)
+	if err != nil {
+		w.WriteHeader(500)
+		app.logger.Error(err.Error())
 	}
 
-	type Data struct {
-		SFBs     map[string]int
-		SFBTotal int
-	}
-
-	err := app.templates.ExecuteTemplate(w, "comp_analysis_results.html", Data{SFBs: sfbCounts, SFBTotal: sfbTotal})
+	err = app.templates.ExecuteTemplate(w, "comp_analysis_results.html", data)
 	if err != nil {
 		w.WriteHeader(500)
 		app.logger.Error(err.Error())
