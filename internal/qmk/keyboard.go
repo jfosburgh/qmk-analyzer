@@ -35,7 +35,7 @@ type KeyCap struct {
 
 func (k *Keyboard) ApplyFingermap(fingermap Fingermap) error {
 	if len(k.Keys) != len(fingermap.Keys) {
-		return fmt.Errorf("number keys in keyboard %d != number keys in fingermap %s", len(k.Keys), len(fingermap.Keys))
+		return fmt.Errorf("number keys in keyboard %d != number keys in fingermap %d", len(k.Keys), len(fingermap.Keys))
 	}
 
 	for i := range len(k.Keys) {

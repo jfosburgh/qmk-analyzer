@@ -38,6 +38,7 @@ type SessionData struct {
 	Layout    *qmk.Layout
 	Keymap    *qmk.KeymapData
 	FingerMap *qmk.Fingermap
+	KeyFinder *qmk.KeyFinder
 	ID        string
 }
 
@@ -78,9 +79,26 @@ func (app *application) handleFingermapSelected(w http.ResponseWriter, r *http.R
 	}
 
 	sessionData.FingerMap = &fingermap
+
+	layers, err := sessionData.Keymap.ParseLayers()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		app.logger.Error(err.Error())
+		return
+	}
+
+	keyfinder, err := qmk.CreateKeyfinder(layers, fingermap)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		app.logger.Error(err.Error())
+		return
+	}
+
+	sessionData.KeyFinder = &keyfinder
+
 	app.sessionCache.Set(sessionData.ID, sessionData)
 
-	app.respondWithKeyboardVisualizer(w, sessionData, 0)
+	app.respondWithAnalysisPage(w, sessionData, 0)
 }
 
 func (app *application) handleFingerChange(w http.ResponseWriter, r *http.Request) {
@@ -139,9 +157,26 @@ func (app *application) handlePostFingermap(w http.ResponseWriter, r *http.Reque
 
 	app.qmkHelper.SaveFingermap(sessionData.Keymap.Layout, name, fingermap)
 	sessionData.FingerMap = &fingermap
+
+	layers, err := sessionData.Keymap.ParseLayers()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		app.logger.Error(err.Error())
+		return
+	}
+
+	keyfinder, err := qmk.CreateKeyfinder(layers, fingermap)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		app.logger.Error(err.Error())
+		return
+	}
+
+	sessionData.KeyFinder = &keyfinder
+
 	app.sessionCache.Set(sessionData.ID, sessionData)
 
-	app.respondWithKeyboardVisualizer(w, sessionData, 0)
+	app.respondWithAnalysisPage(w, sessionData, 0)
 }
 
 func (app *application) handleGetFingermap(w http.ResponseWriter, r *http.Request, sessionData SessionData) {
@@ -271,6 +306,29 @@ func (app *application) handleKeymapSelect(w http.ResponseWriter, r *http.Reques
 	app.respondWithFingermapCreator(w, sessionData)
 }
 
+func (app *application) handleAnalyze(w http.ResponseWriter, r *http.Request, sessionData SessionData) {
+	text := r.FormValue("text")
+	repeats := r.FormValue("repeats") == "on"
+
+	sfbCounts := sessionData.KeyFinder.CountSameFingerNGrams(text, 2, repeats)
+
+	sfbTotal := 0
+	for _, count := range sfbCounts {
+		sfbTotal += count
+	}
+
+	type Data struct {
+		SFBs     map[string]int
+		SFBTotal int
+	}
+
+	err := app.templates.ExecuteTemplate(w, "comp_analysis_results.html", Data{SFBs: sfbCounts, SFBTotal: sfbTotal})
+	if err != nil {
+		w.WriteHeader(500)
+		app.logger.Error(err.Error())
+	}
+}
+
 func (app *application) handleIndex(w http.ResponseWriter, r *http.Request) {
 	keymaps, err := app.qmkHelper.GetAllCustomKeymaps()
 	if err != nil {
@@ -343,6 +401,7 @@ func (app *application) routes() http.Handler {
 	handler.Handle("POST /fingermapselect", app.getSession(app.handleFingermapSelectionChanged))
 	handler.Handle("POST /fingermapselected", app.getSession(app.handleFingermapSelected))
 	handler.HandleFunc("POST /fingerchange/{index}", app.handleFingerChange)
+	handler.Handle("POST /analyze", app.getSession(app.handleAnalyze))
 
 	return app.metrics(app.enableCORS(app.rateLimit(handler)))
 }

@@ -45,6 +45,40 @@ func getRandomFilename(extension string) (string, error) {
 	return fmt.Sprintf("%x%s", name, extension), err
 }
 
+func (app *application) respondWithAnalysisPage(w http.ResponseWriter, sessionData SessionData, layer int) {
+	keyboard, err := app.qmkHelper.GetKeyboard(sessionData.Layout, sessionData.Keymap, layer)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		app.logger.Error(err.Error())
+		return
+	}
+
+	err = keyboard.ApplyFingermap(*sessionData.FingerMap)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		app.logger.Error(err.Error())
+		return
+	}
+
+	type Data struct {
+		SessionID string
+		Keyboard  qmk.Keyboard
+		Analysis  any
+	}
+
+	data := Data{
+		SessionID: sessionData.ID,
+		Keyboard:  keyboard,
+	}
+
+	err = app.templates.ExecuteTemplate(w, "analyze.html", data)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		app.logger.Error(err.Error())
+		return
+	}
+}
+
 func (app *application) respondWithVisualizer(w http.ResponseWriter, sessionData SessionData, layer int, visualizer string) {
 	keyboard, err := app.qmkHelper.GetKeyboard(sessionData.Layout, sessionData.Keymap, layer)
 	if err != nil {

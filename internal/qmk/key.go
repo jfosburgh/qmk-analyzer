@@ -8,15 +8,6 @@ import (
 	"strings"
 )
 
-type Keystroke struct {
-	Action string
-	Type   string
-	Target string
-}
-
-type KeyNode struct {
-}
-
 type KC struct {
 	Default string
 	Shift   string

@@ -4,3 +4,4 @@
 {{template "comp_select.html" .FingermapOptions}}
 <button hx-post="/fingermapselected" hx-include="#fingermapselect-form, #sessionform"
 	hx-target="#content">Select</button>
+{{template "comp_finger_legend.html"}}

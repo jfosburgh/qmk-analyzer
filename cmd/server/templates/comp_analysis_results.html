@@ -1,0 +1,15 @@
+<div id="analysis">
+	{{ if . }}
+	<h3>Same Finger Bigrams</h3>
+	{{ if .SFBs }}
+	<h4>Total SFBs: {{.SFBTotal}}</h4>
+	{{ range $sfb, $count := .SFBs }}
+	<p>{{$sfb}}: {{$count}}</p>
+	{{end}}
+	{{ else }}
+	<p>Congrats, there were no bigrams found!</p>
+	{{ end }}
+	{{ else }}
+	Enter text to be analyzed above
+	{{end}}
+</div>
