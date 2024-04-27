@@ -217,11 +217,11 @@ var (
 		"RIGHT_CTRL": {Default: "rctrl"},
 		"RCTL":       {Default: "rctrl"},
 
-		"LEFT_SHIFT": {Default: "lshift"},
-		"LSFT":       {Default: "lshift"},
+		"LEFT_SHIFT": {Default: "lsft"},
+		"LSFT":       {Default: "lsft"},
 
-		"RIGHT_SHIFT": {Default: "rshift"},
-		"RSFT":        {Default: "rshift"},
+		"RIGHT_SHIFT": {Default: "rsft"},
+		"RSFT":        {Default: "rsft"},
 
 		"LEFT_ALT": {Default: "lalt"},
 		"LALT":     {Default: "lalt"},

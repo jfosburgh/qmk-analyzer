@@ -7,30 +7,6 @@ import (
 	"testing"
 )
 
-func TestMakeNGrams(t *testing.T) {
-	symbols := []string{"a", "b", "c"}
-
-	expected := []string{
-		"ab",
-		"ac",
-		"ba",
-		"bc",
-		"ca",
-		"cb",
-	}
-	ArrayEqualUnordered(t, expected, MakeNGrams(symbols, 2))
-
-	expected = []string{
-		"abc",
-		"acb",
-		"bac",
-		"bca",
-		"cab",
-		"cba",
-	}
-	ArrayEqualUnordered(t, expected, MakeNGrams(symbols, 3))
-}
-
 func makePermutations(letters []string, length int) []string {
 	if len(letters) < length {
 		return []string{}
@@ -55,7 +31,7 @@ func makePermutations(letters []string, length int) []string {
 	return permutations
 }
 
-func FindSFNs(t *testing.T) {
+func TestFindSFNs(t *testing.T) {
 	q, err := NewQMKHelper("./test_content/layouts/", "./test_content/keymaps/", "./test_content/fingermaps/")
 	NoError(t, err)
 
@@ -65,40 +41,27 @@ func FindSFNs(t *testing.T) {
 	layers, err := keymap.ParseLayers()
 	NoError(t, err)
 
-	fingermap, err := q.LoadFingermapFromJSON("ferris_sweep_test.json")
+	fingermap, err := q.LoadFingermapFromJSON("./test_content/fingermaps/LAYOUT_split_3x5_2/ferris_sweep_test.json")
+	NoError(t, err)
+
+	layout, err := q.GetLayoutData("LAYOUT_split_3x5_2")
 	NoError(t, err)
 
 	keyfinder, err := CreateKeyfinder(layers, fingermap)
 	NoError(t, err)
 
-	symbols := strings.Split("abcdefghijklmnopqrstuvwxyz", "")
-	bigrams := MakeNGrams(symbols, 2)
+	text := "quest Phone"
 
-	groupedByFinger := []string{
-		"yiq",
-		"csv",
-		"lrw",
-		"mtdkgj",
-		"zpbfnh",
-		"ue",
-		"a",
-		"xo",
+	keyboardState := NewKeyboardState(0, layout, keyfinder)
+	actual, err := keyboardState.Analyze(text, true)
+	fmt.Printf("%+v\n", actual)
+	NoError(t, err)
+
+	expectedCount := 3
+	Equal(t, expectedCount, actual.SFBTotal)
+
+	expectedFingerCount := [10]int{0, 0, 0, 0, 1, 0, 0, 1, 1, 0}
+	for i := range 10 {
+		Equal(t, expectedFingerCount[i], actual.SFBFingerCounts[i])
 	}
-
-	expected := []string{}
-	for _, letters := range groupedByFinger {
-		expected = append(expected, makePermutations(strings.Split(letters, ""), 2)...)
-	}
-
-	sfbs := keyfinder.FindSameFingerNGrams(bigrams)
-	ArrayEqualUnordered(t, expected, sfbs)
-
-	expected = []string{}
-	for _, letters := range groupedByFinger {
-		expected = append(expected, makePermutations(strings.Split(letters, ""), 3)...)
-	}
-
-	trigrams := MakeNGrams(symbols, 3)
-	sfts := keyfinder.FindSameFingerNGrams(trigrams)
-	ArrayEqualUnordered(t, expected, sfts)
 }
