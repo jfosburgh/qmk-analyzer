@@ -38,7 +38,7 @@ type SessionData struct {
 	Layout    *qmk.Layout
 	Keymap    *qmk.KeymapData
 	FingerMap *qmk.Fingermap
-	KeyFinder *qmk.KeyFinder
+	Sequencer *qmk.Sequencer
 	ID        string
 }
 
@@ -94,7 +94,7 @@ func (app *application) handleFingermapSelected(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	sessionData.KeyFinder = &keyfinder
+	sessionData.Sequencer = qmk.NewSequencer(0, keyfinder)
 
 	app.sessionCache.Set(sessionData.ID, sessionData)
 
@@ -172,7 +172,7 @@ func (app *application) handlePostFingermap(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	sessionData.KeyFinder = &keyfinder
+	sessionData.Sequencer = qmk.NewSequencer(0, keyfinder)
 
 	app.sessionCache.Set(sessionData.ID, sessionData)
 
@@ -310,11 +310,12 @@ func (app *application) handleAnalyze(w http.ResponseWriter, r *http.Request, se
 	text := r.FormValue("text")
 	repeats := r.FormValue("repeats") == "on"
 
-	data, err := sessionData.KeyFinder.Analyze(text, repeats)
+	err := sessionData.Sequencer.Build(text)
 	if err != nil {
 		w.WriteHeader(500)
 		app.logger.Error(err.Error())
 	}
+	data := sessionData.Sequencer.Analyze(repeats)
 
 	err = app.templates.ExecuteTemplate(w, "comp_analysis_results.html", data)
 	if err != nil {

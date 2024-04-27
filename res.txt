@@ -1,1 +1,0 @@
-ok  	github.com/qmk-analyzer/internal/qmk	0.004s
