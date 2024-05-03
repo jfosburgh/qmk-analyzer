@@ -1,8 +1,6 @@
 package qmk
 
 import (
-	"fmt"
-	"slices"
 	"sort"
 	"strings"
 )
@@ -28,362 +26,108 @@ type CountEntry struct {
 	Value int
 }
 
-type LayerQueue struct {
-	Queue []int
-}
-
-func (q *LayerQueue) Push(layer int) {
-	q.Queue = append([]int{layer}, q.Queue...)
-}
-
-func (q *LayerQueue) Pop() {
-	q.Queue = q.Queue[1:]
-}
-
-func (q *LayerQueue) Active() int {
-	return q.Queue[0]
-}
-
-func (q *LayerQueue) Set(layers []int) {
-	q.Queue = make([]int, len(layers))
-	copy(q.Queue, layers)
-}
-
 type Sequencer struct {
-	Sequence   []SequenceEvent
-	LayerQueue LayerQueue
-	KeyFinder  KeyFinder
-	Active     []SequenceKey
-	Shifted    bool
+	KeyFinder       KeyFinder
+	Layers          [][]KC
+	LayerStack      []int
+	Occupied        map[int]KeyPress
+	Sequence        []KeyPress
+	DefaultLayer    int
+	LastLocation    [10]int
+	Layout          Layout
+	MovementWeights [10]MovementCost
 }
 
-type SequenceEvent struct {
-	Action string
-	Key    SequenceKey
+type MovementCost struct {
+	X float64
+	Y float64
 }
 
-type SequenceKey struct {
-	Label  string
-	Index  int
-	Finger int
-}
-
-func NewSequencer(defaultLayer int, keyfinder KeyFinder) *Sequencer {
-	s := Sequencer{
-		KeyFinder: keyfinder,
-	}
-	s.LayerQueue.Push(defaultLayer)
-
-	return &s
-}
-
-func (s *Sequencer) BestShiftInLayer(layer int) (KeyPress, bool) {
-	leftShiftOptions, lsftPresent := s.KeyFinder["lsft"]
-	rightShiftOptions, rsftPresent := s.KeyFinder["rsft"]
-
-	if !(lsftPresent || rsftPresent) {
-		return KeyPress{}, false
+func (s *Sequencer) ActiveLayer() int {
+	layersInStack := len(s.LayerStack)
+	if layersInStack == 0 {
+		return s.DefaultLayer
 	}
 
-	shiftOptions := append(leftShiftOptions, rightShiftOptions...)
-	shiftInLayer := InLayer(layer, shiftOptions)
-
-	if len(shiftInLayer) == 0 {
-		return KeyPress{}, false
-	}
-
-	playable := s.GetPlayable(shiftInLayer)
-	if len(playable) == 0 {
-		return KeyPress{}, false
-	}
-
-	return s.ChooseOptimal(playable), true
+	return s.LayerStack[layersInStack-1]
 }
 
-func (s *Sequencer) GetPlayable(keys []KeyPress) []KeyPress {
+func (s *Sequencer) Shifted() bool {
+	for _, keyPress := range s.Occupied {
+		if strings.Contains(keyPress.Val, "sft") {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (s *Sequencer) CanBePlayed(keyPress KeyPress) bool {
+	_, occupied := s.Occupied[keyPress.Finger]
+	if occupied {
+		return false
+	}
+
+	if keyPress.Layer != s.ActiveLayer() {
+		return false
+	}
+
+	return keyPress.Shifted == s.Shifted()
+}
+
+func filterByLayer(options []KeyPress, layer int) []KeyPress {
+	inLayer := []KeyPress{}
+	for _, keyPress := range options {
+		if keyPress.Layer == layer {
+			inLayer = append(inLayer, keyPress)
+		}
+	}
+
+	return inLayer
+}
+
+func (s *Sequencer) filterPlayable(options []KeyPress) []KeyPress {
 	playable := []KeyPress{}
-
-	for _, key := range keys {
-		_, canBePlayed := s.CreateEventsForKeyPress(key, false)
-		if canBePlayed {
-			playable = append(playable, key)
+	for _, keyPress := range options {
+		if s.CanBePlayed(keyPress) {
+			playable = append(playable, keyPress)
 		}
 	}
 
 	return playable
 }
 
-func (s *Sequencer) Cost(key KeyPress) float64 {
+func (s *Sequencer) fingerMoveCost(targetIndex, finger int) float64 {
+	dx := s.Layout[targetIndex].X - s.Layout[s.LastLocation[finger-1]].X
+	dy := s.Layout[targetIndex].Y - s.Layout[s.LastLocation[finger-1]].Y
 
-	return 0
+	weights := s.MovementWeights[finger-1]
+	return dx*weights.X + dy*weights.Y
 }
 
 func (s *Sequencer) ChooseOptimal(options []KeyPress) KeyPress {
+	bestOption := options[0]
+	bestCost := s.fingerMoveCost(bestOption.Index, bestOption.Finger)
+
 	if len(options) == 1 {
-		return options[0]
+		return bestOption
 	}
 
-	minCost := s.Cost(options[0])
-	bestKey := options[0]
-
-	for _, key := range options[1:] {
-		cost := s.Cost(key)
-		if cost < minCost {
-			minCost = cost
-			bestKey = key
+	for _, option := range options[1:] {
+		cost := s.fingerMoveCost(option.Index, option.Finger)
+		if cost < bestCost {
+			bestCost = cost
+			bestOption = option
 		}
 	}
 
-	return bestKey
-}
-
-func (s *Sequencer) GetUnshiftEvent() (SequenceKey, bool) {
-	for _, event := range s.Active {
-		if strings.Contains(event.Label, "sft") {
-			return event, true
-		}
-	}
-
-	return SequenceKey{}, false
-}
-
-func (s *Sequencer) CreateEventsForKeyPress(key KeyPress, hold bool) ([]SequenceEvent, bool) {
-	events := []SequenceEvent{}
-
-	needsShift := key.Shifted
-
-	if needsShift && !s.Shifted {
-		shiftKey, ok := s.BestShiftInLayer(key.Layer)
-		if !ok {
-			fmt.Printf("couldn't find shift in layer %d\n", key.Layer)
-			return events, false
-		}
-
-		shiftEvents, ok := s.CreateEventsForKeyPress(shiftKey, true)
-		events = append(events, shiftEvents...)
-	} else if !needsShift && s.Shifted {
-		unshift, ok := s.GetUnshiftEvent()
-		if !ok {
-			fmt.Println("requested unshift but found no active shift key")
-		}
-
-		events = append(events, SequenceEvent{
-			Action: "release",
-			Key:    unshift,
-		})
-	}
-
-	for _, activeKey := range s.Active {
-		if key.Finger == activeKey.Finger {
-			if len(events) != 0 && events[len(events)-1].Action == "release" && strings.Contains(events[len(events)-1].Key.Label, "sft") {
-				fmt.Printf("found overlapping fingers in %+v and %+v, but continuing because shift scheduled for release\n", key, activeKey)
-				continue
-			}
-			fmt.Printf("found overlapping fingers in %+v and %+v\n", key, activeKey)
-			return events, false
-		}
-	}
-
-	events = append(events, SequenceEvent{
-		Action: "press",
-		Key: SequenceKey{
-			Label:  key.Val,
-			Index:  key.Index,
-			Finger: key.Finger,
-		},
-	})
-
-	if !hold {
-		events = append(events, SequenceEvent{
-			Action: "release",
-			Key: SequenceKey{
-				Label:  key.Val,
-				Index:  key.Index,
-				Finger: key.Finger,
-			},
-		})
-	}
-
-	return events, true
-}
-
-// TODO: implement layers
-func (s *Sequencer) AddToSequence(events []SequenceEvent) {
-	for _, event := range events {
-		s.Sequence = append(s.Sequence, event)
-		if event.Action == "release" {
-			removeIndex := -1
-			for i, key := range s.Active {
-				if key == event.Key {
-					removeIndex = i
-
-					if strings.Contains(event.Key.Label, "sft") {
-						s.Shifted = false
-					}
-					break
-				}
-			}
-
-			s.Active = append(s.Active[:removeIndex], s.Active[removeIndex+1:]...)
-		} else if event.Action == "press" {
-			s.Active = append(s.Active, event.Key)
-
-			if strings.Contains(event.Key.Label, "sft") {
-				s.Shifted = true
-			}
-		}
-	}
-}
-
-func (s *Sequencer) TestAddToSequence(events []SequenceEvent) *Sequencer {
-	testSequencer := Sequencer{
-		Sequence:   make([]SequenceEvent, len(s.Sequence)),
-		Active:     make([]SequenceKey, len(s.Active)),
-		LayerQueue: LayerQueue{},
-	}
-
-	copy(testSequencer.Sequence, s.Sequence)
-	copy(testSequencer.Active, s.Active)
-	testSequencer.LayerQueue.Set(s.LayerQueue.Queue)
-
-	testSequencer.AddToSequence(events)
-	return &testSequencer
-}
-
-// TODO: implement this
-func (s *Sequencer) PathToLayer(targetLayer int) ([]SequenceEvent, bool) {
-	events := []SequenceEvent{}
-
-	return events, true
-}
-
-func (s *Sequencer) Build(text string) error {
-	chars := strings.Split(text, "")
-
-	for i := range len(chars) {
-		remap, remapped := Remap[chars[i]]
-		if remapped {
-			chars[i] = remap
-		}
-
-		options, ok := s.KeyFinder[string(chars[i])]
-		if !ok {
-			return fmt.Errorf("Couldn't find %s in keyboard", chars[i])
-		}
-
-		inLayer := InLayer(s.LayerQueue.Active(), options)
-		if len(inLayer) == 0 {
-			travelMap := make(map[int][]SequenceEvent)
-
-			for _, option := range options {
-				_, ok := travelMap[option.Layer]
-				if ok {
-					continue
-				}
-
-				events, pathExists := s.PathToLayer(option.Layer)
-				_, playable := s.TestAddToSequence(events).CreateEventsForKeyPress(option, false)
-				if pathExists && playable {
-					travelMap[option.Layer] = events
-				}
-			}
-
-			minIndex := -1
-			minEvents := 100
-			for i, events := range travelMap {
-				if len(events) < minEvents {
-					minIndex = i
-					minEvents = len(events)
-				}
-			}
-
-			if minIndex == -1 {
-				fmt.Printf("Couldn't find a path from layer %d to layers of any of the options for key %s: %+v", s.LayerQueue.Active(), chars[i], options)
-				continue
-			}
-
-			s.AddToSequence(travelMap[minIndex])
-
-			inLayer = InLayer(s.LayerQueue.Active(), options)
-		}
-
-		if len(inLayer) == 0 {
-			fmt.Printf("couldn't find a way to press %s in the current layer %d from options %+v, skipping\n", chars[i], s.LayerQueue.Active(), options)
-			continue
-		}
-		bestOption := s.ChooseOptimal(inLayer)
-		events, ok := s.CreateEventsForKeyPress(bestOption, false)
-		if !ok {
-			return fmt.Errorf("couldn't play chosen best option - best: %+v, options: %+v", bestOption, inLayer)
-		}
-
-		s.AddToSequence(events)
-	}
-
-	return nil
-}
-
-func (s *Sequencer) Play(textOnly bool) string {
-	unRemap := make(map[string]string)
-	for key, val := range Remap {
-		unRemap[val] = key
-	}
-
-	builder := strings.Builder{}
-
-	for _, event := range s.Sequence {
-		text := event.Key.Label
-
-		if slices.Contains([]string{"lsft", "rsft"}, text) {
-			if !textOnly {
-				builder.Write([]byte(fmt.Sprintf("<%s>", text)))
-			}
-			continue
-		}
-
-		if event.Action == "press" {
-			unremapped, ok := unRemap[text]
-			if ok {
-				text = unremapped
-			}
-			builder.Write([]byte(text))
-		}
-	}
-
-	return builder.String()
+	return bestOption
 }
 
 func (s *Sequencer) Analyze(includeRepeated bool) AnalysisData {
 	data := AnalysisData{}
 
 	SFBs := make(map[string]int)
-
-	lastFinger := -1
-	lastKey := ""
-
-	for _, event := range s.Sequence {
-		if event.Action == "press" {
-			if event.Key.Finger == lastFinger {
-				if lastKey == event.Key.Label && !includeRepeated {
-					continue
-				}
-
-				label := fmt.Sprintf("%s%s", lastKey, event.Key.Label)
-
-				_, ok := SFBs[label]
-				if !ok {
-					SFBs[label] = 0
-				}
-				SFBs[label] += 1
-
-				data.SFBTotal += 1
-				data.SFBFingerCounts[lastFinger-1] += 1
-			}
-
-			lastFinger = event.Key.Finger
-			lastKey = event.Key.Label
-		}
-	}
 
 	keys := []string{}
 	for key := range SFBs {

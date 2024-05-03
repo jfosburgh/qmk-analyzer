@@ -118,7 +118,7 @@ func TestBuildWord(t *testing.T) {
 
 	ArrayEqual(t, expected, sequencer.Sequence)
 
-	Equal(t, text, sequencer.Play(true))
+	Equal(t, text, sequencer.PlayFromBeginning(true))
 }
 
 func TestBuildShift(t *testing.T) {
@@ -246,10 +246,10 @@ func TestBuildShift(t *testing.T) {
 	}
 
 	ArrayEqual(t, expectedActive, sequencer.Active)
-	Equal(t, text, sequencer.Play(true))
+	Equal(t, text, sequencer.PlayFromBeginning(true))
 
 	annotated := "<lsft>H<lsft>ell<lsft>O"
-	Equal(t, annotated, sequencer.Play(false))
+	Equal(t, annotated, sequencer.PlayFromBeginning(false))
 
 	analysis := sequencer.Analyze(false)
 	Equal(t, 0, analysis.SFBTotal)
@@ -270,7 +270,7 @@ func TestFullSentence(t *testing.T) {
 
 	sequencer.Build(text)
 
-	Equal(t, text, sequencer.Play(true))
+	Equal(t, text, sequencer.PlayFromBeginning(true))
 
 	expected := CountEntry{
 		Label: "spacelsft",
