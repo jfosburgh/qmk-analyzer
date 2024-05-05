@@ -26,6 +26,7 @@ type AnalysisData struct {
 	LayerSwitches   int
 	LayerCounts     []int
 	FingerTravel    [10]float64
+	FingerCounts    [10]int
 }
 
 type CountEntry struct {
@@ -476,7 +477,9 @@ func (s *Sequencer) Analyze(includeRepeated bool) AnalysisData {
 
 		if strings.Contains(event.Action, "layer") {
 			data.LayerSwitches += 1
-			continue
+			if !strings.Contains(event.Action, "press") {
+				continue
+			}
 		}
 
 		layer := event.Layer
@@ -495,6 +498,7 @@ func (s *Sequencer) Analyze(includeRepeated bool) AnalysisData {
 			}
 
 			s.LastLocation[event.Finger-1] = event.Index
+			data.FingerCounts[event.Finger-1] += 1
 		}
 
 		if lastFinger == event.Finger && (lastVal != event.Val || includeRepeated) {

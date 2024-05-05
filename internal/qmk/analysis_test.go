@@ -438,5 +438,6 @@ func TestFingerDistance(t *testing.T) {
 	Equal(t, text, sequencer.String(true))
 
 	analysis := sequencer.Analyze(true)
-	Equal(t, 38.10, analysis.FingerTravel[3])
+	Equal(t, 38, analysis.FingerTravel[3])
+	Equal(t, 3, analysis.FingerCounts[3])
 }
