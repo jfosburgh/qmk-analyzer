@@ -94,7 +94,7 @@ func (app *application) handleFingermapSelected(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	sessionData.Sequencer = qmk.NewSequencer(0, keyfinder)
+	sessionData.Sequencer = qmk.NewSequencer(keyfinder, *sessionData.Layout)
 
 	app.sessionCache.Set(sessionData.ID, sessionData)
 
@@ -172,7 +172,7 @@ func (app *application) handlePostFingermap(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	sessionData.Sequencer = qmk.NewSequencer(0, keyfinder)
+	sessionData.Sequencer = qmk.NewSequencer(keyfinder, *sessionData.Layout)
 
 	app.sessionCache.Set(sessionData.ID, sessionData)
 

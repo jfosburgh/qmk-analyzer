@@ -18,13 +18,13 @@ func GetSequencer(t *testing.T) *Sequencer {
 	fingermap, err := q.LoadFingermapFromJSON("./test_content/fingermaps/LAYOUT_split_3x5_2/ferris_sweep_test.json")
 	NoError(t, err)
 
-	// layout, err := q.GetLayoutData("LAYOUT_split_3x5_2")
-	// NoError(t, err)
+	layout, err := q.GetLayoutData("LAYOUT_split_3x5_2")
+	NoError(t, err)
 
 	keyfinder, err := CreateKeyfinder(layers, fingermap)
 	NoError(t, err)
 
-	return NewSequencer(0, keyfinder)
+	return NewSequencer(keyfinder, layout)
 }
 
 func TestBuildWord(t *testing.T) {
@@ -36,220 +36,261 @@ func TestBuildWord(t *testing.T) {
 	expected := []SequenceEvent{
 		{
 			Action: "press",
-			Key: SequenceKey{
-				Label:  "h",
-				Index:  26,
-				Finger: 9,
+			KeyPress: KeyPress{
+				Finger:  9,
+				Index:   26,
+				Layer:   0,
+				Shifted: false,
+				Val:     "h",
 			},
 		},
 		{
 			Action: "release",
-			Key: SequenceKey{
-				Label:  "h",
-				Index:  26,
-				Finger: 9,
+			KeyPress: KeyPress{
+				Finger:  9,
+				Index:   26,
+				Layer:   0,
+				Shifted: false,
+				Val:     "h",
 			},
 		},
 		{
 			Action: "press",
-			Key: SequenceKey{
-				Label:  "e",
-				Index:  17,
-				Finger: 8,
+			KeyPress: KeyPress{
+				Finger:  8,
+				Index:   17,
+				Layer:   0,
+				Shifted: false,
+				Val:     "e",
 			},
 		},
 		{
 			Action: "release",
-			Key: SequenceKey{
-				Label:  "e",
-				Index:  17,
-				Finger: 8,
+			KeyPress: KeyPress{
+				Finger:  8,
+				Index:   17,
+				Layer:   0,
+				Shifted: false,
+				Val:     "e",
 			},
 		},
 		{
 			Action: "press",
-			Key: SequenceKey{
-				Label:  "l",
-				Index:  2,
-				Finger: 3,
+			KeyPress: KeyPress{
+				Finger:  3,
+				Index:   2,
+				Layer:   0,
+				Shifted: false,
+				Val:     "l",
 			},
 		},
 		{
 			Action: "release",
-			Key: SequenceKey{
-				Label:  "l",
-				Index:  2,
-				Finger: 3,
+			KeyPress: KeyPress{
+				Finger:  3,
+				Index:   2,
+				Layer:   0,
+				Shifted: false,
+				Val:     "l",
 			},
 		},
 		{
 			Action: "press",
-			Key: SequenceKey{
-				Label:  "l",
-				Index:  2,
-				Finger: 3,
+			KeyPress: KeyPress{
+				Finger:  3,
+				Index:   2,
+				Layer:   0,
+				Shifted: false,
+				Val:     "l",
 			},
 		},
 		{
 			Action: "release",
-			Key: SequenceKey{
-				Label:  "l",
-				Index:  2,
-				Finger: 3,
+			KeyPress: KeyPress{
+				Finger:  3,
+				Index:   2,
+				Layer:   0,
+				Shifted: false,
+				Val:     "l",
 			},
 		},
 		{
 			Action: "press",
-			Key: SequenceKey{
-				Label:  "o",
-				Index:  19,
-				Finger: 6,
+			KeyPress: KeyPress{
+				Finger:  6,
+				Index:   19,
+				Layer:   0,
+				Shifted: false,
+				Val:     "o",
 			},
 		},
 		{
 			Action: "release",
-			Key: SequenceKey{
-				Label:  "o",
-				Index:  19,
-				Finger: 6,
+			KeyPress: KeyPress{
+				Finger:  6,
+				Index:   19,
+				Layer:   0,
+				Shifted: false,
+				Val:     "o",
 			},
 		},
 	}
 
 	ArrayEqual(t, expected, sequencer.Sequence)
 
-	Equal(t, text, sequencer.PlayFromBeginning(true))
+	Equal(t, text, sequencer.String(true))
 }
 
 func TestBuildShift(t *testing.T) {
 	sequencer := GetSequencer(t)
-
 	text := "HellO"
-
 	sequencer.Build(text)
 
 	expected := []SequenceEvent{
 		{
 			Action: "press",
-			Key: SequenceKey{
-				Label:  "lsft",
-				Index:  30,
-				Finger: 5,
+			KeyPress: KeyPress{
+				Finger:  5,
+				Index:   30,
+				Layer:   0,
+				Shifted: false,
+				Val:     "lsft",
 			},
 		},
 		{
 			Action: "press",
-			Key: SequenceKey{
-				Label:  "H",
-				Index:  26,
-				Finger: 9,
+			KeyPress: KeyPress{
+				Finger:  9,
+				Index:   26,
+				Layer:   0,
+				Shifted: true,
+				Val:     "H",
 			},
 		},
 		{
 			Action: "release",
-			Key: SequenceKey{
-				Label:  "H",
-				Index:  26,
-				Finger: 9,
+			KeyPress: KeyPress{
+				Finger:  9,
+				Index:   26,
+				Layer:   0,
+				Shifted: true,
+				Val:     "H",
 			},
 		},
 		{
 			Action: "release",
-			Key: SequenceKey{
-				Label:  "lsft",
-				Index:  30,
-				Finger: 5,
+			KeyPress: KeyPress{
+				Finger:  5,
+				Index:   30,
+				Layer:   0,
+				Shifted: false,
+				Val:     "lsft",
 			},
 		},
 		{
 			Action: "press",
-			Key: SequenceKey{
-				Label:  "e",
-				Index:  17,
-				Finger: 8,
+			KeyPress: KeyPress{
+				Finger:  8,
+				Index:   17,
+				Layer:   0,
+				Shifted: false,
+				Val:     "e",
 			},
 		},
 		{
 			Action: "release",
-			Key: SequenceKey{
-				Label:  "e",
-				Index:  17,
-				Finger: 8,
+			KeyPress: KeyPress{
+				Finger:  8,
+				Index:   17,
+				Layer:   0,
+				Shifted: false,
+				Val:     "e",
 			},
 		},
 		{
 			Action: "press",
-			Key: SequenceKey{
-				Label:  "l",
-				Index:  2,
-				Finger: 3,
+			KeyPress: KeyPress{
+				Finger:  3,
+				Index:   2,
+				Layer:   0,
+				Shifted: false,
+				Val:     "l",
 			},
 		},
 		{
 			Action: "release",
-			Key: SequenceKey{
-				Label:  "l",
-				Index:  2,
-				Finger: 3,
+			KeyPress: KeyPress{
+				Finger:  3,
+				Index:   2,
+				Layer:   0,
+				Shifted: false,
+				Val:     "l",
 			},
 		},
 		{
 			Action: "press",
-			Key: SequenceKey{
-				Label:  "l",
-				Index:  2,
-				Finger: 3,
+			KeyPress: KeyPress{
+				Finger:  3,
+				Index:   2,
+				Layer:   0,
+				Shifted: false,
+				Val:     "l",
 			},
 		},
 		{
 			Action: "release",
-			Key: SequenceKey{
-				Label:  "l",
-				Index:  2,
-				Finger: 3,
+			KeyPress: KeyPress{
+				Finger:  3,
+				Index:   2,
+				Layer:   0,
+				Shifted: false,
+				Val:     "l",
 			},
 		},
 		{
 			Action: "press",
-			Key: SequenceKey{
-				Label:  "lsft",
-				Index:  30,
-				Finger: 5,
+			KeyPress: KeyPress{
+				Finger:  5,
+				Index:   30,
+				Layer:   0,
+				Shifted: false,
+				Val:     "lsft",
 			},
 		},
 		{
 			Action: "press",
-			Key: SequenceKey{
-				Label:  "O",
-				Index:  19,
-				Finger: 6,
+			KeyPress: KeyPress{
+				Finger:  6,
+				Index:   19,
+				Layer:   0,
+				Shifted: true,
+				Val:     "O",
 			},
 		},
 		{
 			Action: "release",
-			Key: SequenceKey{
-				Label:  "O",
-				Index:  19,
-				Finger: 6,
+			KeyPress: KeyPress{
+				Finger:  6,
+				Index:   19,
+				Layer:   0,
+				Shifted: true,
+				Val:     "O",
 			},
 		},
 	}
 
 	ArrayEqual(t, expected, sequencer.Sequence)
 
-	expectedActive := []SequenceKey{
-		{
-			Label:  "lsft",
-			Index:  30,
-			Finger: 5,
-		},
-	}
-
-	ArrayEqual(t, expectedActive, sequencer.Active)
-	Equal(t, text, sequencer.PlayFromBeginning(true))
+	Equal(t, text, sequencer.String(true))
 
 	annotated := "<lsft>H<lsft>ell<lsft>O"
-	Equal(t, annotated, sequencer.PlayFromBeginning(false))
+	Equal(t, annotated, sequencer.String(false))
+}
+
+func TestAnalysis(t *testing.T) {
+	sequencer := GetSequencer(t)
+	text := "HellO"
+	sequencer.Build(text)
 
 	analysis := sequencer.Analyze(false)
 	Equal(t, 0, analysis.SFBTotal)
@@ -270,10 +311,10 @@ func TestFullSentence(t *testing.T) {
 
 	sequencer.Build(text)
 
-	Equal(t, text, sequencer.PlayFromBeginning(true))
+	Equal(t, text, sequencer.String(true))
 
 	expected := CountEntry{
-		Label: "spacelsft",
+		Label: "<space><lsft>",
 		Value: 1,
 	}
 	analysis := sequencer.Analyze(true)
