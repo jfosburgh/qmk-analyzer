@@ -66,11 +66,14 @@ func (k *KeyQueue) Parse() (KC, error) {
 			} else {
 				kc, ok := keycodes[val]
 				if !ok {
-					return KC{}, errors.New(fmt.Sprintf("keycap %s does not exist in keycode map", val))
-				}
+					fmt.Printf("WARN: keycap %s does not exist in keycode map\n", val)
+					key.Default += val
+				} else {
 
-				key.Default += kc.Default
-				key.Shift += kc.Shift
+					key.Default += kc.Default
+					key.Shift += kc.Shift
+					key.Hold += kc.Hold
+				}
 			}
 		} else if slices.Contains([]string{"LSFT", "LCTL", "LALT", "LGUI", "RSFT", "RCTL", "RALT", "RGUI"}, next) {
 			val := k.Pop()
@@ -181,7 +184,8 @@ func (k *KeyQueue) Parse() (KC, error) {
 			}
 			parenOpen -= 1
 		} else {
-			return KC{}, errors.New(fmt.Sprintf("key-type %s not implemented", next))
+			fmt.Printf("WARN: key-type %s not implemented\n", next)
+			key.Default += next + " "
 		}
 	}
 

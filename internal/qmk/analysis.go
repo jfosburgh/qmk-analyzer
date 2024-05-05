@@ -2,7 +2,9 @@ package qmk
 
 import (
 	"fmt"
+	"slices"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -20,6 +22,8 @@ type AnalysisData struct {
 	SFBCounts       []CountEntry
 	SFBFingerCounts [10]int
 	SFBTotal        int
+	LayerSwitches   int
+	LayerCounts     []int
 }
 
 type CountEntry struct {
@@ -36,6 +40,7 @@ type Sequencer struct {
 	LastLocation    [10]int
 	Layout          Layout
 	MovementWeights [10]MovementCost
+	LayerChanges    map[string][]SequenceEvent
 }
 
 type SequenceEvent struct {
@@ -57,6 +62,8 @@ func NewSequencer(keyFinder KeyFinder, layout Layout) *Sequencer {
 		Layout:       layout,
 	}
 
+	s.CreateLayerChangeEvents()
+
 	return &s
 }
 
@@ -67,6 +74,7 @@ func (s *Sequencer) Reset(resetSequence bool) {
 		s.Sequence = []SequenceEvent{}
 	}
 	s.LastLocation = [10]int{}
+	s.CreateLayerChangeEvents()
 }
 
 func (s *Sequencer) ChangeDefaultLayer(layer int) {
@@ -112,9 +120,14 @@ func (s *Sequencer) CanBePlayed(keyPress KeyPress) bool {
 		defer func() { s.Occupied[finger] = shiftKey }()
 	}
 
-	_, occupied := s.Occupied[keyPress.Finger]
+	existingKey, occupied := s.Occupied[keyPress.Finger]
 	if occupied {
-		return false
+		if strings.Contains(existingKey.Val, "sft") {
+			delete(s.Occupied, keyPress.Finger)
+			defer func() { s.Occupied[keyPress.Finger] = existingKey }()
+		} else {
+			return false
+		}
 	}
 
 	if keyPress.Layer != s.ActiveLayer() {
@@ -206,20 +219,164 @@ func (s *Sequencer) ToggleShift(nextFinger int) {
 	}
 }
 
+func (s *Sequencer) AddEvent(event SequenceEvent) {
+	s.Sequence = append(s.Sequence, event)
+}
+
+func (s *Sequencer) EventCanBePlayed(event SequenceEvent) bool {
+	if event.Action == "release" {
+		return true
+	}
+
+	_, occupied := s.Occupied[event.Finger]
+	return !occupied
+}
+
+func (s *Sequencer) PlayableEvents(events []SequenceEvent) []SequenceEvent {
+	playable := []SequenceEvent{}
+
+	for _, event := range events {
+		if s.EventCanBePlayed(event) || event.Action == "layer-release" {
+			playable = append(playable, event)
+		}
+	}
+
+	return playable
+}
+
 func (s *Sequencer) AddKeyPress(keyPress KeyPress) {
 	if keyPress.Shifted != s.Shifted() {
 		s.ToggleShift(keyPress.Finger)
 	}
 
-	s.Sequence = append(s.Sequence, SequenceEvent{
+	s.AddEvent(SequenceEvent{
 		Action:   "press",
 		KeyPress: keyPress,
 	})
 
-	s.Sequence = append(s.Sequence, SequenceEvent{
+	s.AddEvent(SequenceEvent{
 		Action:   "release",
 		KeyPress: keyPress,
 	})
+}
+
+func (s *Sequencer) addToLayerChangeEvents(key string, event SequenceEvent) {
+	_, ok := s.LayerChanges[key]
+	if !ok {
+		s.LayerChanges[key] = []SequenceEvent{}
+	}
+
+	s.LayerChanges[key] = append(s.LayerChanges[key], event)
+}
+
+func (s *Sequencer) CreateLayerChangeEvents() {
+	s.LayerChanges = make(map[string][]SequenceEvent)
+	layerChanges := s.KeyFinder["<layer>"]
+
+	for _, keyPress := range layerChanges {
+		parts := strings.Split(keyPress.Val, " ")
+
+		switch parts[0] {
+		case "LT", "MO":
+			current := keyPress.Layer
+			target, _ := strconv.Atoi(parts[1])
+
+			s.addToLayerChangeEvents(fmt.Sprintf("%d-%d", current, target), SequenceEvent{
+				Action:   "layer-add",
+				KeyPress: keyPress,
+			})
+
+			keyPress.Layer = target
+			s.addToLayerChangeEvents(fmt.Sprintf("%d-%d", target, current), SequenceEvent{
+				Action:   "layer-release",
+				KeyPress: keyPress,
+			})
+		default:
+			fmt.Printf("Unimplemented: %s\n", parts[0])
+		}
+	}
+}
+
+func (s *Sequencer) ApplyLayerChange(event SequenceEvent) {
+	switch event.Action {
+	case "layer-add":
+		s.Sequence = append(s.Sequence, event)
+		newLayer, _ := strconv.Atoi(strings.Split(event.Val, " ")[1])
+		s.LayerStack = append(s.LayerStack, newLayer)
+		s.Occupied[event.Finger] = event.KeyPress
+	case "layer-release":
+		s.Sequence = append(s.Sequence, event)
+		s.LayerStack = s.LayerStack[:len(s.LayerStack)-1]
+		delete(s.Occupied, event.Finger)
+	}
+}
+
+// TODO: multi-event layerchanges
+// TODO: select from multiple options
+func (s *Sequencer) DoLayerChange(targetLayer int) {
+	singleEvents, ok := s.LayerChanges[fmt.Sprintf("%d-%d", s.ActiveLayer(), targetLayer)]
+	for !ok && len(s.LayerStack) > 1 {
+		s.DoLayerChange(s.LayerStack[len(s.LayerStack)-2])
+		singleEvents, ok = s.LayerChanges[fmt.Sprintf("%d-%d", s.ActiveLayer(), targetLayer)]
+	}
+
+	if !ok {
+		panic(fmt.Sprintf("could not find path to %d", targetLayer))
+	}
+
+	playable := s.PlayableEvents(singleEvents)
+
+	s.ApplyLayerChange(playable[0])
+}
+
+// TODO: implement this
+func (s *Sequencer) FindClosestLayer(options []int) int {
+	hasSingleEventLayerChange := []int{}
+
+	for _, targetLayer := range options {
+		_, ok := s.LayerChanges[fmt.Sprintf("%d-%d", s.ActiveLayer(), targetLayer)]
+		if !ok {
+			continue
+		}
+
+		if !slices.Contains(hasSingleEventLayerChange, targetLayer) {
+			hasSingleEventLayerChange = append(hasSingleEventLayerChange, targetLayer)
+		}
+	}
+
+	if len(hasSingleEventLayerChange) > 0 {
+		return hasSingleEventLayerChange[0]
+	}
+
+	return options[0]
+}
+
+// TODO: add playable check to layer selection
+func (s *Sequencer) DoOptimalLayerChange(options []KeyPress) []KeyPress {
+	sortByLayer := make(map[int][]KeyPress)
+	layers := []int{}
+
+	for _, keyPress := range options {
+		_, ok := sortByLayer[keyPress.Layer]
+		if !ok {
+			sortByLayer[keyPress.Layer] = []KeyPress{}
+		}
+
+		sortByLayer[keyPress.Layer] = append(sortByLayer[keyPress.Layer], keyPress)
+
+		if !slices.Contains(layers, keyPress.Layer) {
+			layers = append(layers, keyPress.Layer)
+		}
+	}
+
+	if len(layers) == 1 {
+		s.DoLayerChange(layers[0])
+		return sortByLayer[layers[0]]
+	}
+
+	closestLayer := s.FindClosestLayer(layers)
+	s.DoLayerChange(closestLayer)
+	return sortByLayer[closestLayer]
 }
 
 func (s *Sequencer) Build(text string) error {
@@ -239,7 +396,7 @@ func (s *Sequencer) Build(text string) error {
 
 		inLayer := s.InLayer(allMatches)
 		if len(inLayer) == 0 {
-			return fmt.Errorf("%s not found in layer %d, and layer switching is not implemented", targetString, s.ActiveLayer())
+			inLayer = s.DoOptimalLayerChange(allMatches)
 		}
 
 		playable := s.filterPlayable(inLayer)
@@ -249,6 +406,13 @@ func (s *Sequencer) Build(text string) error {
 
 		optimal := s.ChooseOptimal(playable)
 		s.AddKeyPress(optimal)
+	}
+
+	for _, keyPress := range s.Occupied {
+		s.Sequence = append(s.Sequence, SequenceEvent{
+			Action:   "release",
+			KeyPress: keyPress,
+		})
 	}
 
 	return nil
@@ -273,7 +437,7 @@ func (s *Sequencer) String(charactersOnly bool) string {
 			}
 		case "release":
 			if len(event.Val) > 1 && !charactersOnly {
-				builder.Write([]byte(fmt.Sprintf("<%s>", event.Val)))
+				builder.Write([]byte(fmt.Sprintf("</%s>", event.Val)))
 			}
 		}
 	}
@@ -292,6 +456,17 @@ func (s *Sequencer) Analyze(includeRepeated bool) AnalysisData {
 		if event.Action == "release" {
 			continue
 		}
+
+		if strings.Contains(event.Action, "layer") {
+			data.LayerSwitches += 1
+			continue
+		}
+
+		layer := event.Layer
+		for len(data.LayerCounts) < layer+1 {
+			data.LayerCounts = append(data.LayerCounts, 0)
+		}
+		data.LayerCounts[layer] += 1
 
 		if lastFinger == event.Finger && (lastVal != event.Val || includeRepeated) {
 			builder := strings.Builder{}
@@ -398,13 +573,23 @@ func CreateKeyfinder(layers [][]KC, fingermap Fingermap) (KeyFinder, error) {
 			}
 
 			if kc.Hold != "" {
-				keyfinder.AddKey(kc.Hold, KeyPress{
+				targetKey := kc.Hold
+				keyPress := KeyPress{
 					Finger:  fingermap.Keys[keyIndex],
 					Index:   keyIndex,
 					Layer:   layer,
 					Shifted: false,
-					Val:     kc.Hold,
-				})
+				}
+
+				parts := strings.Split(kc.Hold, " ")
+				if len(parts) == 1 {
+					keyPress.Val = kc.Hold
+				} else {
+					targetKey = "<layer>"
+					keyPress.Val = kc.Hold
+				}
+
+				keyfinder.AddKey(targetKey, keyPress)
 			}
 		}
 	}

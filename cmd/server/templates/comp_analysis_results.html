@@ -4,7 +4,7 @@
 	{{ if .SFBCounts }}
 	<h4>Total SFBs: {{.SFBTotal}}</h4>
 	<h4>By Bigram</h4>
-	<div style="display: flex; flex-wrap: wrap; justify-content: space-evenly; width: 40%;">
+	<div style="display: flex; flex-wrap: wrap; justify-content: space-evenly;">
 		{{ range $item := .SFBCounts }}
 		<p style="padding: 5px;">{{$item.Label}}: {{$item.Value}}</p>
 		{{end}}
@@ -31,6 +31,13 @@
 	{{ else }}
 	<p>Congrats, there were no bigrams found!</p>
 	{{ end }}
+	<h3>Layers</h3>
+	<h4>Total Layer Switches: {{.LayerSwitches}}</h4>
+	<div style="display: flex; justify-content: space-evenly; flex-wrap: wrap;">
+		{{ range $layer, $count := .LayerCounts }}
+		<p>Layer {{ $layer }}: {{ $count }} key presses</p>
+		{{ end }}
+	</div>
 	{{ else }}
 	Enter text to be analyzed above
 	{{end}}

@@ -277,13 +277,23 @@ func TestBuildShift(t *testing.T) {
 				Val:     "O",
 			},
 		},
+		{
+			Action: "release",
+			KeyPress: KeyPress{
+				Finger:  5,
+				Index:   30,
+				Layer:   0,
+				Shifted: false,
+				Val:     "lsft",
+			},
+		},
 	}
 
 	ArrayEqual(t, expected, sequencer.Sequence)
 
 	Equal(t, text, sequencer.String(true))
 
-	annotated := "<lsft>H<lsft>ell<lsft>O"
+	annotated := "<lsft>H</lsft>ell<lsft>O</lsft>"
 	Equal(t, annotated, sequencer.String(false))
 }
 
@@ -319,4 +329,101 @@ func TestFullSentence(t *testing.T) {
 	}
 	analysis := sequencer.Analyze(true)
 	ArrayContains(t, expected, analysis.SFBCounts)
+}
+
+func TestLayerChangeLT(t *testing.T) {
+	sequencer := GetSequencer(t)
+
+	text := "a1b"
+	sequencer.Build(text)
+
+	Equal(t, text, sequencer.String(true))
+
+	expected := []SequenceEvent{
+		{
+			Action: "press",
+			KeyPress: KeyPress{
+				Finger:  7,
+				Index:   18,
+				Layer:   0,
+				Shifted: false,
+				Val:     "a",
+			},
+		},
+		{
+			Action: "release",
+			KeyPress: KeyPress{
+				Finger:  7,
+				Index:   18,
+				Layer:   0,
+				Shifted: false,
+				Val:     "a",
+			},
+		},
+		{
+			Action: "layer-add",
+			KeyPress: KeyPress{
+				Finger:  10,
+				Index:   32,
+				Layer:   0,
+				Shifted: false,
+				Val:     "LT 1",
+			},
+		},
+		{
+			Action: "press",
+			KeyPress: KeyPress{
+				Finger:  9,
+				Index:   26,
+				Layer:   1,
+				Shifted: false,
+				Val:     "1",
+			},
+		},
+		{
+			Action: "release",
+			KeyPress: KeyPress{
+				Finger:  9,
+				Index:   26,
+				Layer:   1,
+				Shifted: false,
+				Val:     "1",
+			},
+		},
+		{
+			Action: "layer-release",
+			KeyPress: KeyPress{
+				Finger:  10,
+				Index:   32,
+				Layer:   1,
+				Shifted: false,
+				Val:     "LT 1",
+			},
+		},
+		{
+			Action: "press",
+			KeyPress: KeyPress{
+				Finger:  9,
+				Index:   25,
+				Layer:   0,
+				Shifted: false,
+				Val:     "b",
+			},
+		},
+		{
+			Action: "release",
+			KeyPress: KeyPress{
+				Finger:  9,
+				Index:   25,
+				Layer:   0,
+				Shifted: false,
+				Val:     "b",
+			},
+		},
+	}
+
+	ArrayEqual(t, expected, sequencer.Sequence)
+
+	analysis := sequencer.Analyze(false)
+	Equal(t, 2, analysis.LayerSwitches)
 }

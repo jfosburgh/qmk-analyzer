@@ -1,4 +1,5 @@
-<form id="textanalysis-form" hx-post="/analyze" hx-include="#sessionform" hx-target="#analysis" hx-trigger="submit">
+<form id="textanalysis-form" hx-post="/analyze" hx-include="#sessionform" hx-target="#analysis" hx-trigger="submit"
+	hx-swap="outerHTML">
 	<label for="text">Enter text to be analyzed</label>
 	<textarea id="text" name="text" rows="6" cols="50"></textarea>
 	<label for="repeats">Include repeated letters? (e.g. 'oo')</label>
