@@ -38,6 +38,25 @@
 		<p>Layer {{ $layer }}: {{ $count }} key presses</p>
 		{{ end }}
 	</div>
+	<h3>Finger Travel</h3>
+	<div style="display: flex; justify-content: space-evenly;">
+		<div style="display: flex; flex-direction: column;">
+			<h5>Left Hand</h5>
+			<p class="finger1">Pinky: {{index .FingerTravel 0}}mm</p>
+			<p class="finger2">Ring Finger: {{index .FingerTravel 1}}mm</p>
+			<p class="finger3">Middle Finger: {{index .FingerTravel 2}}mm</p>
+			<p class="finger4">Pointer Finger: {{index .FingerTravel 3}}mm</p>
+			<p class="finger5">Thumb: {{index .FingerTravel 4}}mm</p>
+		</div>
+		<div style="display: flex; flex-direction: column;">
+			<h5>Right Hand</h5>
+			<p class="finger6">Pinky: {{index .FingerTravel 5}}mm</p>
+			<p class="finger7">Ring Finger: {{index .FingerTravel 6}}mm</p>
+			<p class="finger8">Middle Finger: {{index .FingerTravel 7}}mm</p>
+			<p class="finger9">Pointer Finger: {{index .FingerTravel 8}}mm</p>
+			<p class="finger10">Thumb: {{index .FingerTravel 9}}mm</p>
+		</div>
+	</div>
 	{{ else }}
 	Enter text to be analyzed above
 	{{end}}

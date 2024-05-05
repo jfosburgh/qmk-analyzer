@@ -2,6 +2,7 @@ package qmk
 
 import (
 	"fmt"
+	"math"
 	"slices"
 	"sort"
 	"strconv"
@@ -24,6 +25,7 @@ type AnalysisData struct {
 	SFBTotal        int
 	LayerSwitches   int
 	LayerCounts     []int
+	FingerTravel    [10]float64
 }
 
 type CountEntry struct {
@@ -73,7 +75,7 @@ func (s *Sequencer) Reset(resetSequence bool) {
 	if resetSequence {
 		s.Sequence = []SequenceEvent{}
 	}
-	s.LastLocation = [10]int{}
+	s.LastLocation = [10]int{-1, -1, -1, -1, -1, -1, -1, -1, -1, -1}
 	s.CreateLayerChangeEvents()
 }
 
@@ -170,6 +172,10 @@ func (s *Sequencer) filterPlayable(options []KeyPress) []KeyPress {
 }
 
 func (s *Sequencer) fingerMoveCost(targetIndex, finger int) float64 {
+	if s.LastLocation[finger-1] == -1 {
+		return 0
+	}
+
 	dx := s.Layout[targetIndex].X - s.Layout[s.LastLocation[finger-1]].X
 	dy := s.Layout[targetIndex].Y - s.Layout[s.LastLocation[finger-1]].Y
 
@@ -282,7 +288,7 @@ func (s *Sequencer) CreateLayerChangeEvents() {
 			target, _ := strconv.Atoi(parts[1])
 
 			s.addToLayerChangeEvents(fmt.Sprintf("%d-%d", current, target), SequenceEvent{
-				Action:   "layer-add",
+				Action:   "press-layer-add",
 				KeyPress: keyPress,
 			})
 
@@ -299,7 +305,7 @@ func (s *Sequencer) CreateLayerChangeEvents() {
 
 func (s *Sequencer) ApplyLayerChange(event SequenceEvent) {
 	switch event.Action {
-	case "layer-add":
+	case "press-layer-add":
 		s.Sequence = append(s.Sequence, event)
 		newLayer, _ := strconv.Atoi(strings.Split(event.Val, " ")[1])
 		s.LayerStack = append(s.LayerStack, newLayer)
@@ -445,12 +451,23 @@ func (s *Sequencer) String(charactersOnly bool) string {
 	return builder.String()
 }
 
+type Position struct {
+	X float64
+	Y float64
+}
+
+func EuclideanDistance(p1, p2 KeyPosition) float64 {
+	return math.Sqrt(math.Pow(p2.X-p1.X, 2) + math.Pow(p2.Y-p1.Y, 2))
+}
+
 func (s *Sequencer) Analyze(includeRepeated bool) AnalysisData {
 	data := AnalysisData{}
 	SFBs := make(map[string]int)
 
 	lastFinger := -1
 	lastVal := ""
+
+	s.Reset(false)
 
 	for _, event := range s.Sequence {
 		if event.Action == "release" {
@@ -467,6 +484,18 @@ func (s *Sequencer) Analyze(includeRepeated bool) AnalysisData {
 			data.LayerCounts = append(data.LayerCounts, 0)
 		}
 		data.LayerCounts[layer] += 1
+
+		if strings.Contains(event.Action, "press") {
+			lastLocation := s.LastLocation[event.Finger-1]
+			if lastLocation != -1 {
+				p1 := s.Layout[lastLocation]
+				p2 := s.Layout[event.Index]
+
+				data.FingerTravel[event.Finger-1] += EuclideanDistance(p1, p2) * 19.05
+			}
+
+			s.LastLocation[event.Finger-1] = event.Index
+		}
 
 		if lastFinger == event.Finger && (lastVal != event.Val || includeRepeated) {
 			builder := strings.Builder{}
@@ -511,6 +540,10 @@ func (s *Sequencer) Analyze(includeRepeated bool) AnalysisData {
 			Label: key,
 			Value: SFBs[key],
 		})
+	}
+
+	for i := range data.FingerTravel {
+		data.FingerTravel[i] = math.Round(data.FingerTravel[i])
 	}
 
 	return data

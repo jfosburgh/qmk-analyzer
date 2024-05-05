@@ -361,7 +361,7 @@ func TestLayerChangeLT(t *testing.T) {
 			},
 		},
 		{
-			Action: "layer-add",
+			Action: "press-layer-add",
 			KeyPress: KeyPress{
 				Finger:  10,
 				Index:   32,
@@ -426,4 +426,17 @@ func TestLayerChangeLT(t *testing.T) {
 
 	analysis := sequencer.Analyze(false)
 	Equal(t, 2, analysis.LayerSwitches)
+}
+
+func TestFingerDistance(t *testing.T) {
+	sequencer := GetSequencer(t)
+
+	text := "tdt"
+
+	sequencer.Build(text)
+
+	Equal(t, text, sequencer.String(true))
+
+	analysis := sequencer.Analyze(true)
+	Equal(t, 38.10, analysis.FingerTravel[3])
 }
