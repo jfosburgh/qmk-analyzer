@@ -18,6 +18,7 @@ type KeymapData struct {
 	Layout        string     `json:"layout"`
 	Layers        [][]string `json:"layers"`
 	Author        string     `json:"author"`
+	Path          string
 }
 
 type Keycode struct {
@@ -59,6 +60,8 @@ func LoadKeymapFromJSON(jsonPath string, keymapData *KeymapData) error {
 	if err != nil {
 		return err
 	}
+
+	keymapData.Path = jsonPath
 
 	return nil
 }

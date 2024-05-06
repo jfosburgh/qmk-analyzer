@@ -26,7 +26,9 @@ type AnalysisData struct {
 	LayerSwitches   int
 	LayerCounts     []int
 	FingerTravel    [10]float64
+	TotalTravel     float64
 	FingerCounts    [10]int
+	LayersUsed      int
 }
 
 type CountEntry struct {
@@ -548,7 +550,11 @@ func (s *Sequencer) Analyze(includeRepeated bool) AnalysisData {
 
 	for i := range data.FingerTravel {
 		data.FingerTravel[i] = math.Round(data.FingerTravel[i])
+		data.TotalTravel += data.FingerTravel[i]
 	}
+
+	data.TotalTravel = math.Round(data.TotalTravel / 1000)
+	data.LayersUsed = len(data.LayerCounts)
 
 	return data
 }

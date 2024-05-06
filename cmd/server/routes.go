@@ -35,11 +35,31 @@ type selectOptions struct {
 }
 
 type SessionData struct {
-	Layout    *qmk.Layout
-	Keymap    *qmk.KeymapData
-	FingerMap *qmk.Fingermap
-	Sequencer *qmk.Sequencer
-	ID        string
+	Layout       *qmk.Layout
+	Keymap       *qmk.KeymapData
+	FingerMap    *qmk.Fingermap
+	ID           string
+	AnalysisData map[string]qmk.AnalysisData
+	AnalysisText string
+}
+
+func (app *application) handleKeymapChange(w http.ResponseWriter, r *http.Request, sessionData SessionData) {
+	keymapPath := r.FormValue("keymapchange")
+	if keymapPath == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	keymapData, err := app.qmkHelper.GetKeymapData(keymapPath)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	sessionData.Keymap = &keymapData
+	app.sessionCache.Set(sessionData.ID, sessionData)
+
+	app.respondWithAnalysisPage(w, sessionData, 0)
 }
 
 func (app *application) handleFingermapSelectionChanged(w http.ResponseWriter, r *http.Request, sessionData SessionData) {
@@ -79,22 +99,6 @@ func (app *application) handleFingermapSelected(w http.ResponseWriter, r *http.R
 	}
 
 	sessionData.FingerMap = &fingermap
-
-	layers, err := sessionData.Keymap.ParseLayers()
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		app.logger.Error(err.Error())
-		return
-	}
-
-	keyfinder, err := qmk.CreateKeyfinder(layers, fingermap)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		app.logger.Error(err.Error())
-		return
-	}
-
-	sessionData.Sequencer = qmk.NewSequencer(keyfinder, *sessionData.Layout)
 
 	app.sessionCache.Set(sessionData.ID, sessionData)
 
@@ -157,22 +161,6 @@ func (app *application) handlePostFingermap(w http.ResponseWriter, r *http.Reque
 
 	app.qmkHelper.SaveFingermap(sessionData.Keymap.Layout, name, fingermap)
 	sessionData.FingerMap = &fingermap
-
-	layers, err := sessionData.Keymap.ParseLayers()
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		app.logger.Error(err.Error())
-		return
-	}
-
-	keyfinder, err := qmk.CreateKeyfinder(layers, fingermap)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		app.logger.Error(err.Error())
-		return
-	}
-
-	sessionData.Sequencer = qmk.NewSequencer(keyfinder, *sessionData.Layout)
 
 	app.sessionCache.Set(sessionData.ID, sessionData)
 
@@ -310,14 +298,50 @@ func (app *application) handleAnalyze(w http.ResponseWriter, r *http.Request, se
 	text := r.FormValue("text")
 	repeats := r.FormValue("repeats") == "on"
 
-	err := sessionData.Sequencer.Build(text)
+	keymaps, err := app.qmkHelper.GetCustomKeymapsForLayouts(sessionData.Keymap.Layout)
 	if err != nil {
-		w.WriteHeader(500)
+		w.WriteHeader(http.StatusInternalServerError)
 		app.logger.Error(err.Error())
+		return
 	}
-	data := sessionData.Sequencer.Analyze(repeats)
 
-	err = app.templates.ExecuteTemplate(w, "comp_analysis_results.html", data)
+	sessionData.AnalysisText = text
+	sessionData.AnalysisData = make(map[string]qmk.AnalysisData)
+
+	for _, keymap := range keymaps {
+		keymapData, err := app.qmkHelper.GetKeymapData(keymap.ID)
+		if err != nil {
+			w.WriteHeader(500)
+			app.logger.Error(err.Error())
+		}
+
+		layers, err := keymapData.ParseLayers()
+		if err != nil {
+			w.WriteHeader(500)
+			app.logger.Error(err.Error())
+		}
+
+		keyfinder, err := qmk.CreateKeyfinder(layers, *sessionData.FingerMap)
+		if err != nil {
+			w.WriteHeader(500)
+			app.logger.Error(err.Error())
+		}
+
+		sequencer := qmk.NewSequencer(keyfinder, *sessionData.Layout)
+
+		err = sequencer.Build(text)
+		if err != nil {
+			w.WriteHeader(500)
+			app.logger.Error(err.Error())
+		}
+
+		data := sequencer.Analyze(repeats)
+		sessionData.AnalysisData[keymap.ID] = data
+	}
+
+	app.sessionCache.Set(sessionData.ID, sessionData)
+
+	err = app.templates.ExecuteTemplate(w, "comp_analysis_results.html", sessionData.AnalysisData[sessionData.Keymap.Path])
 	if err != nil {
 		w.WriteHeader(500)
 		app.logger.Error(err.Error())
@@ -362,7 +386,10 @@ func (app *application) handleIndex(w http.ResponseWriter, r *http.Request) {
 		app.logger.Error(err.Error())
 	}
 
-	sessionData := SessionData{ID: sessionId}
+	sessionData := SessionData{
+		ID:           sessionId,
+		AnalysisText: "This is some sample text to get you started.\n\nTo get the best results, paste some text that reflects what you type on a daily basis.",
+	}
 	app.sessionCache.Set(sessionId, sessionData)
 
 	data := Data{
@@ -388,6 +415,7 @@ func (app *application) routes() http.Handler {
 
 	handler.HandleFunc("GET /", app.handleIndex)
 	handler.Handle("POST /keymapselect", app.getSession(app.handleKeymapSelect))
+	handler.Handle("POST /keymapchange", app.getSession(app.handleKeymapChange))
 	handler.Handle("POST /keymap/upload", app.getSession(app.handleKeymapUpload))
 	handler.Handle("POST /layout/upload", app.getSession(app.handleLayoutUpload))
 	handler.Handle("POST /layerselect", app.getSession(app.handleLayerSelect))

@@ -60,15 +60,47 @@ func (app *application) respondWithAnalysisPage(w http.ResponseWriter, sessionDa
 		return
 	}
 
+	keymaps, err := app.qmkHelper.GetCustomKeymapsForLayouts(sessionData.Keymap.Layout)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		app.logger.Error(err.Error())
+		return
+	}
+
 	type Data struct {
-		SessionID string
-		Keyboard  qmk.Keyboard
-		Analysis  any
+		SessionID     string
+		Keyboard      qmk.Keyboard
+		Analysis      any
+		KeymapOptions selectOptions
+		Text          string
+	}
+
+	keymapSelectOptions := selectOptions{
+		Selected:   sessionData.Keymap.Path,
+		Name:       "keymapchange",
+		Label:      "Compare with another keymap",
+		SwapTarget: "content",
+		Include:    "#sessionform",
+		Trigger:    "change",
+	}
+
+	for _, option := range keymaps {
+		keymapSelectOptions.Options = append(keymapSelectOptions.Options, SelectOption{
+			Name: option.Name,
+			ID:   option.ID,
+		})
 	}
 
 	data := Data{
-		SessionID: sessionData.ID,
-		Keyboard:  keyboard,
+		SessionID:     sessionData.ID,
+		Keyboard:      keyboard,
+		KeymapOptions: keymapSelectOptions,
+		Text:          sessionData.AnalysisText,
+	}
+
+	analysis, ok := sessionData.AnalysisData[sessionData.Keymap.Path]
+	if ok {
+		data.Analysis = analysis
 	}
 
 	err = app.templates.ExecuteTemplate(w, "analyze.html", data)

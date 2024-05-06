@@ -106,3 +106,22 @@ header>h1 {
 	width: 16px;
 	text-align: center;
 }
+
+#analysis {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+}
+
+.analysis-section {
+	border-radius: 10px;
+	padding: 15px 30px;
+	width: 100%;
+	margin-bottom: 30px;
+	background-color: lightgray;
+}
+
+h3 {
+	margin-top: 0px;
+}

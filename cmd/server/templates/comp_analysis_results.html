@@ -1,82 +1,91 @@
 <div id="analysis">
 	{{ if . }}
-	<h3>Keypresses Per Finger</h3>
-	<div style="display: flex; justify-content: space-evenly;">
-		<div style="display: flex; flex-direction: column;">
-			<h5>Left Hand</h5>
-			<p class="finger1">Pinky: {{index .FingerCounts 0}}</p>
-			<p class="finger2">Ring Finger: {{index .FingerCounts 1}}</p>
-			<p class="finger3">Middle Finger: {{index .FingerCounts 2}}</p>
-			<p class="finger4">Pointer Finger: {{index .FingerCounts 3}}</p>
-			<p class="finger5">Thumb: {{index .FingerCounts 4}}</p>
-		</div>
-		<div style="display: flex; flex-direction: column;">
-			<h5>Right Hand</h5>
-			<p class="finger6">Pinky: {{index .FingerCounts 5}}</p>
-			<p class="finger7">Ring Finger: {{index .FingerCounts 6}}</p>
-			<p class="finger8">Middle Finger: {{index .FingerCounts 7}}</p>
-			<p class="finger9">Pointer Finger: {{index .FingerCounts 8}}</p>
-			<p class="finger10">Thumb: {{index .FingerCounts 9}}</p>
-		</div>
-	</div>
-	<h3>Same Finger Bigrams</h3>
-	{{ if .SFBCounts }}
-	<h4>Total SFBs: {{.SFBTotal}}</h4>
-	<h4>By Bigram</h4>
-	<div style="display: flex; flex-wrap: wrap; justify-content: space-evenly;">
-		{{ range $item := .SFBCounts }}
-		<p style="padding: 5px;">{{$item.Label}}: {{$item.Value}}</p>
-		{{end}}
-	</div>
-	<h4>By Finger</h4>
-	<div style="display: flex; justify-content: space-evenly;">
-		<div style="display: flex; flex-direction: column;">
-			<h5>Left Hand</h5>
-			<p class="finger1">Pinky: {{index .SFBFingerCounts 0}}</p>
-			<p class="finger2">Ring Finger: {{index .SFBFingerCounts 1}}</p>
-			<p class="finger3">Middle Finger: {{index .SFBFingerCounts 2}}</p>
-			<p class="finger4">Pointer Finger: {{index .SFBFingerCounts 3}}</p>
-			<p class="finger5">Thumb: {{index .SFBFingerCounts 4}}</p>
-		</div>
-		<div style="display: flex; flex-direction: column;">
-			<h5>Right Hand</h5>
-			<p class="finger6">Pinky: {{index .SFBFingerCounts 5}}</p>
-			<p class="finger7">Ring Finger: {{index .SFBFingerCounts 6}}</p>
-			<p class="finger8">Middle Finger: {{index .SFBFingerCounts 7}}</p>
-			<p class="finger9">Pointer Finger: {{index .SFBFingerCounts 8}}</p>
-			<p class="finger10">Thumb: {{index .SFBFingerCounts 9}}</p>
+	<div class="analysis-section">
+		<h3>Keypresses Per Finger</h3>
+		<div style="display: flex; justify-content: space-evenly;">
+			<div style="display: flex; flex-direction: column;">
+				<h5>Left Hand</h5>
+				<p class="finger1">Pinky: {{index .FingerCounts 0}}</p>
+				<p class="finger2">Ring Finger: {{index .FingerCounts 1}}</p>
+				<p class="finger3">Middle Finger: {{index .FingerCounts 2}}</p>
+				<p class="finger4">Pointer Finger: {{index .FingerCounts 3}}</p>
+				<p class="finger5">Thumb: {{index .FingerCounts 4}}</p>
+			</div>
+			<div style="display: flex; flex-direction: column;">
+				<h5>Right Hand</h5>
+				<p class="finger6">Pinky: {{index .FingerCounts 5}}</p>
+				<p class="finger7">Ring Finger: {{index .FingerCounts 6}}</p>
+				<p class="finger8">Middle Finger: {{index .FingerCounts 7}}</p>
+				<p class="finger9">Pointer Finger: {{index .FingerCounts 8}}</p>
+				<p class="finger10">Thumb: {{index .FingerCounts 9}}</p>
+			</div>
 		</div>
 	</div>
-	{{ else }}
-	<p>Congrats, there were no bigrams found!</p>
-	{{ end }}
-	<h3>Layers</h3>
-	<h4>Total Layer Switches: {{.LayerSwitches}}</h4>
-	<div style="display: flex; justify-content: space-evenly; flex-wrap: wrap;">
-		{{ range $layer, $count := .LayerCounts }}
-		<p>Layer {{ $layer }}: {{ $count }} key presses</p>
+	<div class="analysis-section">
+		<h3>Same Finger Bigrams</h3>
+		{{ if .SFBCounts }}
+		<h4>Total SFBs: {{.SFBTotal}}</h4>
+		<h4>By Bigram</h4>
+		<div style="display: flex; flex-wrap: wrap; justify-content: space-evenly;">
+			{{ range $item := .SFBCounts }}
+			<p style="padding: 20px;"><em>{{$item.Label}}:</em> {{$item.Value}}</p>
+			{{end}}
+		</div>
+		<h4>By Finger</h4>
+		<div style="display: flex; justify-content: space-evenly;">
+			<div style="display: flex; flex-direction: column;">
+				<h5>Left Hand</h5>
+				<p class="finger1">Pinky: {{index .SFBFingerCounts 0}}</p>
+				<p class="finger2">Ring Finger: {{index .SFBFingerCounts 1}}</p>
+				<p class="finger3">Middle Finger: {{index .SFBFingerCounts 2}}</p>
+				<p class="finger4">Pointer Finger: {{index .SFBFingerCounts 3}}</p>
+				<p class="finger5">Thumb: {{index .SFBFingerCounts 4}}</p>
+			</div>
+			<div style="display: flex; flex-direction: column;">
+				<h5>Right Hand</h5>
+				<p class="finger6">Pinky: {{index .SFBFingerCounts 5}}</p>
+				<p class="finger7">Ring Finger: {{index .SFBFingerCounts 6}}</p>
+				<p class="finger8">Middle Finger: {{index .SFBFingerCounts 7}}</p>
+				<p class="finger9">Pointer Finger: {{index .SFBFingerCounts 8}}</p>
+				<p class="finger10">Thumb: {{index .SFBFingerCounts 9}}</p>
+			</div>
+		</div>
+		{{ else }}
+		<p>Congrats, there were no bigrams found!</p>
 		{{ end }}
 	</div>
-	<h3>Finger Travel</h3>
-	<div style="display: flex; justify-content: space-evenly;">
-		<div style="display: flex; flex-direction: column;">
-			<h5>Left Hand</h5>
-			<p class="finger1">Pinky: {{index .FingerTravel 0}}mm</p>
-			<p class="finger2">Ring Finger: {{index .FingerTravel 1}}mm</p>
-			<p class="finger3">Middle Finger: {{index .FingerTravel 2}}mm</p>
-			<p class="finger4">Pointer Finger: {{index .FingerTravel 3}}mm</p>
-			<p class="finger5">Thumb: {{index .FingerTravel 4}}mm</p>
+	<div class="analysis-section">
+		<h3>Layers</h3>
+		<h4>Layers Utilized: {{.LayersUsed}}</h4>
+		<h4>Total Layer Switches: {{.LayerSwitches}}</h4>
+		<div style="display: flex; justify-content: space-evenly; flex-wrap: wrap;">
+			{{ range $layer, $count := .LayerCounts }}
+			<p style="padding: 20px;"><em>Layer {{ $layer }}:</em> {{ $count }} key presses</p>
+			{{ end }}
 		</div>
-		<div style="display: flex; flex-direction: column;">
-			<h5>Right Hand</h5>
-			<p class="finger6">Pinky: {{index .FingerTravel 5}}mm</p>
-			<p class="finger7">Ring Finger: {{index .FingerTravel 6}}mm</p>
-			<p class="finger8">Middle Finger: {{index .FingerTravel 7}}mm</p>
-			<p class="finger9">Pointer Finger: {{index .FingerTravel 8}}mm</p>
-			<p class="finger10">Thumb: {{index .FingerTravel 9}}mm</p>
+		<h3>Finger Travel</h3>
+		<h4>Total Travel: {{.TotalTravel}}m</h4>
+		<h4>By Finger</h4>
+		<div style="display: flex; justify-content: space-evenly;">
+			<div style="display: flex; flex-direction: column;">
+				<h5>Left Hand</h5>
+				<p class="finger1">Pinky: {{index .FingerTravel 0}}mm</p>
+				<p class="finger2">Ring Finger: {{index .FingerTravel 1}}mm</p>
+				<p class="finger3">Middle Finger: {{index .FingerTravel 2}}mm</p>
+				<p class="finger4">Pointer Finger: {{index .FingerTravel 3}}mm</p>
+				<p class="finger5">Thumb: {{index .FingerTravel 4}}mm</p>
+			</div>
+			<div style="display: flex; flex-direction: column;">
+				<h5>Right Hand</h5>
+				<p class="finger6">Pinky: {{index .FingerTravel 5}}mm</p>
+				<p class="finger7">Ring Finger: {{index .FingerTravel 6}}mm</p>
+				<p class="finger8">Middle Finger: {{index .FingerTravel 7}}mm</p>
+				<p class="finger9">Pointer Finger: {{index .FingerTravel 8}}mm</p>
+				<p class="finger10">Thumb: {{index .FingerTravel 9}}mm</p>
+			</div>
 		</div>
 	</div>
 	{{ else }}
-	Enter text to be analyzed above
+	<em>Enter text to be analyzed above</em>
 	{{end}}
 </div>

@@ -1,8 +1,11 @@
-<form id="textanalysis-form" hx-post="/analyze" hx-include="#sessionform" hx-target="#analysis" hx-trigger="submit"
-	hx-swap="outerHTML">
+<form style="padding-top: 30px; padding-bottom: 30px;" id="textanalysis-form" hx-post="/analyze"
+	hx-include="#sessionform" hx-target="#analysis" hx-trigger="submit" hx-swap="outerHTML">
 	<label for="text">Enter text to be analyzed</label>
-	<textarea id="text" name="text" rows="6" cols="50"></textarea>
+	<br />
+	<textarea id="text" name="text" rows="10" cols="100" style="width: 100%;">{{.}}</textarea>
+	<br />
 	<label for="repeats">Include repeated letters? (e.g. 'oo')</label>
 	<input type="checkbox" id="repeats" name="repeats">
+	<br />
 	<button type="submit">Analyze</button>
 </form>
