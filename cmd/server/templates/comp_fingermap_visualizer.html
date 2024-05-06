@@ -1,6 +1,7 @@
-<div class="visualizer" id="visualizer">
+<div class="visualizer" id="visualizer" style="padding-bottom: 50px;">
 	<div class="keyboard-container" style="width: {{.Width}}px; height: {{.Height}}px;">
-		<form hx-post="/fingermap" hx-include="#sessionform" hx-target="#content" hx-swap="innerHTML">
+		<form id="fingermap-form" hx-post="/fingermap" hx-include="#sessionform" hx-target="#content"
+			hx-swap="innerHTML">
 			{{ range .Keys }}
 			<div class="key-container" style="top: {{.Y}}px; left: {{.X}}px; width: {{.W}}px; height: {{.H}}px;">
 				{{template "comp_finger_input.html" .}}

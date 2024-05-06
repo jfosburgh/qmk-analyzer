@@ -125,3 +125,16 @@ header>h1 {
 h3 {
 	margin-top: 0px;
 }
+
+#fingermap-form {
+	width: 100%;
+	height: calc(100% + 30px);
+}
+
+#fingermap-form>button {
+	position: absolute;
+	top: 100%;
+	margin-top: 10px;
+	left: calc(50% - 50px);
+	width: 100px;
+}

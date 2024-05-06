@@ -120,7 +120,7 @@ func (q *QMKHelper) ApplyKeymap(keyboard *Keyboard, keymap *KeymapData, layer in
 	}
 
 	if keyboard.LayerCount > 0 && len(keyboard.Keys) != len(keymap.Layers[0]) {
-		return errors.New(fmt.Sprintf("number of keys in layout %d does not match number of keys in keymap %d for %s", layer, keyboard.LayerCount, keymap.Keymap))
+		return errors.New(fmt.Sprintf("number of keys in keymap (%d) does not match number of keys in layout (%d) for %s", len(keymap.Layers[0]), len(keyboard.Keys), keymap.Keymap))
 	}
 
 	for i := range keyboard.Keys {

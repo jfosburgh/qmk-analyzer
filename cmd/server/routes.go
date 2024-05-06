@@ -198,6 +198,12 @@ func (app *application) handleKeymapUpload(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	if keymapData.Layout == "LAYOUT" {
+		w.WriteHeader(http.StatusBadRequest)
+		app.logger.Error("layout field must not be LAYOUT")
+		return
+	}
+
 	keymapKey := keymapData.Keymap
 
 	if app.cfg.saveKeymapUploads {

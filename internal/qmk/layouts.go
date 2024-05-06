@@ -66,6 +66,7 @@ func (q *QMKHelper) SaveLayout(name string, data []byte) (string, error) {
 }
 
 func LoadLayoutFromJSON(jsonPath string, layoutData *LayoutData) error {
+	fmt.Printf("loading layout json from %s\n", jsonPath)
 	f, err := os.Open(jsonPath)
 	defer f.Close()
 

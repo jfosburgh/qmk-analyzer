@@ -1,8 +1,13 @@
+<h2>Upload a layout</h2>
 <p>A layout file for {{.}} could not be found on the server, please upload it.</p>
-<form id="keymapupload-form" hx-encoding="multipart/form-data" hx-post="/layout/upload"
-	_='on htmx:xhr:progress(loaded, total) set #progress.value to (loaded/total)*100' hx-target="#content"
+<form id="keymapupload-form" hx-encoding="multipart/form-data" hx-post="/layout/upload" hx-target="#content"
 	hx-swap="innerHTML" hx-include="#sessionform">
 	<input type="file" name="layout-file" />
+	<br />
 	<button>Upload</button>
-	<progress id='progress' value='0' max="100"></progress>
 </form>
+<p>Try looking for an <strong>info.json</strong> file in a subfolder of <a
+		href="https://github.com/qmk/qmk_firmware/blob/master/layouts/default/"
+		target="_blank">https://github.com/qmk/qmk_firmware/blob/master/layouts/default/</a> corresponding to
+	{{.}}</p>
+<!-- <p><em></em></p> -->

@@ -15,8 +15,16 @@
 <body>
 	{{ template "comp_session.html" .SessionID }}
 	<div id="content">
+		<h2>Upload your keymap</h2>
 		{{ template "comp_keymap_upload.html" . }}
-		<p>or choose a premade keymap</p>
+		<p><em>Make sure the <strong>"layout"</strong> field in your keymap json file is not named
+				<strong>LAYOUT</strong> (as is sometimes the case when generating your keymap json with <a
+					href="https://config.qmk.fm/" target="_blank">QMK Configurator</a>), but rather has a name
+				descriptive of the actual physical layout of the
+				keyboard, e.g. <strong>LAYOUT_split_3x5_2</strong> or <strong>LAYOUT_fullsize_ansi</strong>. This name
+				is used to lookup your the layout from the server's filesystem, so it must be unique to the layout
+				(though it can be shared by multiple keymaps with the same layout).</em></p>
+		<h3 style="margin-top: 20px;">or choose a premade keymap</h3>
 		{{ template "comp_select.html" .KeymapSelectOptions }}
 	</div>
 </body>

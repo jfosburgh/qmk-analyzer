@@ -1,6 +1,6 @@
-<p>Create a fingermap</p>
+<h2>Create a fingermap</h2>
 {{template "comp_fingermap_visualizer.html" .Keyboard}}
-<p>or choose an existing fingermap</p>
+<h3>or choose an existing fingermap</h3>
 {{template "comp_select.html" .FingermapOptions}}
 <button hx-post="/fingermapselected" hx-include="#fingermapselect-form, #sessionform"
 	hx-target="#content">Select</button>
