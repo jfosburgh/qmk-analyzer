@@ -1,6 +1,14 @@
 <div id="analysis">
 	{{ if . }}
 	<div class="analysis-section">
+		<h3>Analysis Summary</h3>
+		<p><strong>Same Finger Bigrams:</strong> {{.SFBTotal}}</p>
+		<p><strong>Layer Switches:</strong> {{.LayerSwitches}}</p>
+		<p><strong>Layers Utilized:</strong> {{.LayersUsed}}</p>
+		<p><strong>Total Travel:</strong> {{.TotalTravel}}m</p>
+		<h4>Score: {{.Score}}</h4>
+	</div>
+	<div class="analysis-section">
 		<h3>Keypresses Per Finger</h3>
 		<div style="display: flex; justify-content: space-evenly;">
 			<div style="display: flex; flex-direction: column;">
@@ -63,6 +71,8 @@
 			<p style="padding: 20px;"><em>Layer {{ $layer }}:</em> {{ $count }} key presses</p>
 			{{ end }}
 		</div>
+	</div>
+	<div class="analysis-section">
 		<h3>Finger Travel</h3>
 		<h4>Total Travel: {{.TotalTravel}}m</h4>
 		<h4>By Finger</h4>

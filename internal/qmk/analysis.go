@@ -29,6 +29,7 @@ type AnalysisData struct {
 	TotalTravel     float64
 	FingerCounts    [10]int
 	LayersUsed      int
+	Score           float64
 }
 
 type CountEntry struct {
@@ -400,7 +401,8 @@ func (s *Sequencer) Build(text string) error {
 
 		allMatches, ok := s.KeyFinder[targetString]
 		if !ok {
-			return fmt.Errorf("Could not find %s in keyboard", targetString)
+			fmt.Printf("WARN: Could not find '%s' in keyboard, skipping. (Results may be inaccurate)\n", targetString)
+			continue
 		}
 
 		inLayer := s.InLayer(allMatches)
@@ -410,7 +412,8 @@ func (s *Sequencer) Build(text string) error {
 
 		playable := s.filterPlayable(inLayer)
 		if len(playable) == 0 {
-			return fmt.Errorf("%s found but not playable due to occupied fingers: %+v", targetString, s.Occupied)
+			fmt.Printf("WARN: '%s' found but not playable due to occupied fingers: %+v, skipping. (Results may be inaccurate)\n", targetString, s.Occupied)
+			continue
 		}
 
 		optimal := s.ChooseOptimal(playable)
@@ -555,6 +558,8 @@ func (s *Sequencer) Analyze(includeRepeated bool) AnalysisData {
 
 	data.TotalTravel = math.Round(data.TotalTravel / 1000)
 	data.LayersUsed = len(data.LayerCounts)
+
+	data.Score = math.Round(float64(data.SFBTotal)/4 + float64(data.LayerSwitches)/8 + data.TotalTravel)
 
 	return data
 }
