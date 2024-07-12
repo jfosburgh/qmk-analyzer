@@ -1,4 +1,5 @@
 # qmk-analyzer
+![banner](./assets/banner.png)
 ## Description
 A keyboard analyzer for custom layouts in the [QMK](https://config.qmk.fm/#/) format.
 ## Why?
