@@ -21,7 +21,3 @@
 bin
 go.work
 
-layouts
-keymaps
-fingermaps
-**/test_content/**
